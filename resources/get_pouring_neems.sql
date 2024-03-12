@@ -50,7 +50,7 @@ WHERE task_type.s = task.dul_Task_o
   and hie.dul_TimeInterval_s = hib.dul_TimeInterval_s
 #   and tf_ib.soma_hasIntervalBegin_ID = hib.ID
 #   and tf_ib.soma_hasIntervalEnd_ID = hie.ID
-  and tfh.stamp BETWEEN hib.o - 20 AND hie.o
+  and tfh.stamp BETWEEN hib.o - 40 AND hie.o
   and tf.header = tfh.ID
   and tf.child_frame_id = SUBSTRING_INDEX(base_link.urdf_Link_o, ':', '-1')
   and tft.ID = tf.ID

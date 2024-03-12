@@ -99,13 +99,33 @@ def filter_by_neem_id(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:
     return filter_dataframe(all_neems_df, {'neem_id': neem_id})
 
 
-def get_neem_ids(all_neems_df: pd.DataFrame) -> List[str]:
+def get_neem_ids(all_neems_df: pd.DataFrame, unique: Optional[bool] = True) -> List[str]:
     """
     Get the NEEM IDs from a DataFrame
     :param all_neems_df: the DataFrame which has all the NEEMs data.
+    :param unique: whether to return unique NEEM IDs or not.
     :return: the NEEM IDs.
     """
-    return all_neems_df['neem_id'].unique().tolist()
+    if unique:
+        return all_neems_df['neem_id'].unique().tolist()
+    else:
+        return all_neems_df['neem_id'].tolist()
+
+
+def get_participants_per_neem(all_neems_df: pd.DataFrame, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    """
+    Get the participants in each NEEM
+    :param all_neems_df: the DataFrame which has all the NEEMs data.
+    :param unique: whether to return unique participants or not.
+    :return: the participants in each NEEM.
+    """
+    neem_ids = get_neem_ids(all_neems_df)
+    participants_per_neem = []
+    for neem_id in neem_ids:
+        neem_df = filter_by_neem_id(all_neems_df, neem_id)
+        participants = get_participants(neem_df, unique)
+        participants_per_neem.extend([(neem_id, p) for p in participants])
+    return participants_per_neem
 
 
 def get_participants(neem_df: pd.DataFrame, unique: Optional[bool] = True) -> List[str]:
@@ -168,9 +188,14 @@ def get_indices(df: pd.DataFrame, filters: dict) -> pd.Series:
     :param filters: the filters to apply.
     :return: the indices for the filtered DataFrame.
     """
-    indices = pd.Series([True] * len(df))
+    initial_condition = True
+    indices = None
     for column, value in filters.items():
-        indices = indices & (df[column] == value)
+        if initial_condition:
+            indices = df[column] == value
+            initial_condition = False
+        else:
+            indices = indices & (df[column] == value)
     return indices
 
 
