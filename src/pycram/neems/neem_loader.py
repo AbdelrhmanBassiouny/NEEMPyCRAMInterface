@@ -1,12 +1,9 @@
 import pandas as pd
 import rospy
 from sqlalchemy import Engine, text
-<<<<<<< HEAD
-=======
 from typing_extensions import List, Iterable, Tuple, Optional
 
-from .datastructures.pose import Pose, Transform
->>>>>>> 6fa0ced... [NEEM2PyCRAM]
+from pycram.datastructures.pose import Pose, Transform
 
 
 def get_dataframe_from_sql_query_file(sql_filename: str, engine: Engine) -> pd.DataFrame:
@@ -41,54 +38,6 @@ def get_dataframe_from_sql_query(sql_query: str, engine: Engine) -> pd.DataFrame
     return df
 
 
-<<<<<<< HEAD
-class NEEMLoader:
-    """
-    A class to load data from a NEEM stored in a SQL database.
-    """
-
-    def __init__(self, engine: Engine, sql_query: str, neem_id: str):
-        """
-        Create a NEEMLoader
-        :param engine: the SQLAlchemy engine to use.
-        :param sql_query: the SQL query.
-        :param neem_id: the NEEM ID.
-        """
-        self.engine = engine
-        all_neems_df = get_dataframe_from_sql_query(sql_query, engine)
-        self.df = self.get_data_of_certain_neem(all_neems_df, neem_id)
-
-    @classmethod
-    def from_sql_query_file(cls, engine: Engine, sql_filename: str, neem_id: str) -> 'NEEMLoader':
-        """
-        Create a NEEMLoader from a SQL file
-        :param engine: the SQLAlchemy engine to use.
-        :param sql_filename: the name of the SQL file.
-        :param neem_id: the NEEM ID.
-        """
-        sql_query = get_sql_query_from_file(sql_filename)
-        return cls(engine, sql_query, neem_id)
-
-    @staticmethod
-    def get_data_of_certain_neem(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:
-        """
-        Get the data of a certain NEEM from a DataFrame
-        :param all_neems_df: the DataFrame which has all the NEEMs data.
-        :param neem_id: the NEEM ID.
-        :return: the data of the NEEM.
-        """
-        neem_indices = all_neems_df['neem_id'] == neem_id
-        return all_neems_df[neem_indices]
-
-    @staticmethod
-    def get_participants(neem_df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Get the participants in a certain NEEM
-        :param neem_df: the DataFrame which has the neem data.
-        :return: the participants in the NEEM.
-        """
-        return neem_df['participant'].unique()
-=======
 def filter_by_neem_id(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:
     """
     Get the data of a certain NEEM from a DataFrame
@@ -148,7 +97,7 @@ def filter_by_participant_type(neem_df: pd.DataFrame, participant_type: str) -> 
     :param participant_type: the participant type.
     :return: the data of the participant type.
     """
-    return filter_dataframe(neem_df, {'participant_type': participant_type})
+    return filter_dataframe(neem_df, {'has_participant_type': participant_type})
 
 
 def get_environment(neem_df: pd.DataFrame) -> List[str]:
@@ -168,6 +117,16 @@ def filter_by_participant(neem_df: pd.DataFrame, participant: str) -> pd.DataFra
     :return: the data of the participant.
     """
     return filter_dataframe(neem_df, {'has_participant': participant})
+
+
+def filter_by_task(neem_df: pd.DataFrame, task: str) -> pd.DataFrame:
+    """
+    Get the data of a certain task from a DataFrame
+    :param neem_df: the DataFrame which has the neem data.
+    :param task: the task name.
+    :return: the data of the task.
+    """
+    return filter_dataframe(neem_df, {'executes_task_type': task})
 
 
 def filter_dataframe(df: pd.DataFrame, filters: dict) -> pd.DataFrame:
@@ -281,4 +240,3 @@ def get_orientations(df: pd.DataFrame) -> Tuple[List[float], List[float], List[f
     :return: the orientations.
     """
     return df['rx'].tolist(), df['ry'].tolist(), df['rz'].tolist(), df['rw'].tolist()
->>>>>>> 6fa0ced... [NEEM2PyCRAM]
