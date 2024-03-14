@@ -63,10 +63,10 @@ def get_neem_ids(all_neems_df: pd.DataFrame, unique: Optional[bool] = True) -> L
 
 def get_participants_per_neem(all_neems_df: pd.DataFrame, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
     """
-    Get the participants in each NEEM
+    Get the participant_types in each NEEM
     :param all_neems_df: the DataFrame which has all the NEEMs data.
-    :param unique: whether to return unique participants or not.
-    :return: the participants in each NEEM.
+    :param unique: whether to return unique participant_types or not.
+    :return: the participant_types in each NEEM.
     """
     neem_ids = get_neem_ids(all_neems_df)
     participants_per_neem = []
@@ -79,10 +79,10 @@ def get_participants_per_neem(all_neems_df: pd.DataFrame, unique: Optional[bool]
 
 def get_participants(neem_df: pd.DataFrame, unique: Optional[bool] = True) -> List[str]:
     """
-    Get the participants in a certain NEEM
+    Get the participant_types in a certain NEEM
     :param neem_df: the DataFrame which has the neem data.
-    :param unique: whether to return unique participants or not.
-    :return: the participants in the NEEM.
+    :param unique: whether to return unique participant_types or not.
+    :return: the participant_types in the NEEM.
     """
     if unique:
         return neem_df['has_participant'].unique().tolist()
