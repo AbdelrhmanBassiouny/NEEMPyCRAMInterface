@@ -19,7 +19,7 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_sql_like(self):
         tasks = (self.nl.session.query(DulExecutesTask).
-                filter(DulExecutesTask.dul_Task_o.like("%Pour%")).first())
+                 _filter(DulExecutesTask.dul_Task_o.like("%Pour%")).first())
         self.assertIsNotNone(tasks)
 
     def test_get_task_data(self):
@@ -46,10 +46,17 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(df)
 
     def test_multi_join(self):
-        nl_query = (self.nl.select(DulExecutesTask.dul_Task_o).join_task_types().
+        nl_query = (self.nl.join_task_types(select_tasks=True).
                     join_task_participants().
-                    join_participant_types())
-        df = pd.read_sql_query(nl_query.statement, self.nl.engine)
+                    join_participant_types().
+                    join_participant_base_link().
+                    join_task_time_interval().
+                    join_tf_on_time_interval())
+                    # filter_tf_by_base_link().
+                    # join_tf_transfrom())
+        stmt = nl_query.statement
+        print(stmt)
+        df = pd.read_sql_query(stmt, self.nl.engine)
         print(df)
         self.assertIsNotNone(df)
 

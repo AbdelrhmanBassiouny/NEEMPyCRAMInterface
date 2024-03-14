@@ -24,6 +24,7 @@ class NeemLoader:
         self.joins: Optional[Dict[Table, BinaryExpression]] = {}
         self.in_filters: Optional[Dict[Column, List]] = {}
         self.remove_filters: Optional[Dict[Column, List]] = {}
+        self.filters: Optional[List[BinaryExpression]] = []
 
     def get_task(self, task: str) -> DulExecutesTask:
         """
@@ -76,7 +77,16 @@ class NeemLoader:
         :param table: the table.
         :return: True if the table has a neem_id column, False otherwise.
         """
-        return "neem_id" in self.get_column_names(table)
+        return self.has_column(table, "neem_id")
+
+    def has_column(self, table: InstrumentedAttribute, column: str) -> bool:
+        """
+        Check if a table has a column
+        :param table: the table.
+        :param column: the column name.
+        :return: True if the table has the column, False otherwise.
+        """
+        return column in self.get_column_names(table)
 
     def get_neem_id_conditions(self, tables: List[Table], neem_id: InstrumentedAttribute) -> BinaryExpression:
         """
@@ -217,7 +227,7 @@ class NeemLoader:
         self.query = select(*self.selected_columns)
         for table, on in self.joins.items():
             self.query = self.query.join(table, on)
-        return self.filter(self.in_filters, self.remove_filters)
+        return self._filter(self.in_filters, self.remove_filters, self.filters)
 
     def join_task_participants(self, participants: Optional[List[str]] = None,
                                remove_participants: Optional[List[str]] = None,
@@ -237,15 +247,10 @@ class NeemLoader:
             self.selected_columns.append(DulExecutesTask.dul_Task_o.label("task"))
         if select_columns:
             self.selected_columns.append(DulHasParticipant.dul_Object_o.label("participant"))
-        if remove_participants is None:
-            remove_participants = ["owl:NamedIndividual"]
-        else:
-            remove_participants.append("owl:NamedIndividual")
         joins = {DulHasParticipant: DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s}
         in_filters = {DulHasParticipant.dul_Object_o: participants,
-                   DulHasParticipant.neem_id: [DulExecutesTask.neem_id]}
-        remove_filters = {DulHasParticipant.dul_Object_o: remove_participants}
-        self._update_joins_metadata(joins, in_filters, remove_filters)
+                      DulHasParticipant.neem_id: [DulExecutesTask.neem_id]}
+        self._update_joins_metadata(joins, in_filters)
         return self
 
     def join_participant_types(self, participant_types: Optional[List[str]] = None,
@@ -273,7 +278,7 @@ class NeemLoader:
 
         joins = {ParticipantType: ParticipantType.s == DulHasParticipant.dul_Object_o}
         in_filters = {ParticipantType.o: participant_types,
-                   ParticipantType.neem_id: [DulHasParticipant.neem_id]}
+                      ParticipantType.neem_id: [DulHasParticipant.neem_id]}
         remove_filters = {ParticipantType.o: remove_participant_types}
         self._update_joins_metadata(joins, in_filters, remove_filters)
         return self
@@ -303,13 +308,13 @@ class NeemLoader:
 
         joins = {TaskType: TaskType.s == DulExecutesTask.dul_Task_o}
         in_filters = {TaskType.o: tasks,
-                   TaskType.neem_id: [DulExecutesTask.neem_id]}
+                      TaskType.neem_id: [DulExecutesTask.neem_id]}
         remove_filters = {TaskType.o: remove_tasks}
         self._update_joins_metadata(joins, in_filters, remove_filters)
         return self
 
     def join_participant_base_link(self, select_participants: Optional[bool] = False,
-                                   select_columns: Optional[bool] = False) -> 'NeemLoader':
+                                   select_columns: Optional[bool] = True) -> 'NeemLoader':
         """
         Add base links of participant_types to the query,
         Assumes participant_types have been joined/selected already if select_participants is False,
@@ -319,16 +324,16 @@ class NeemLoader:
         :return: the modified query.
         """
         if select_participants:
-            self.selected_columns.append(DulHasParticipant.dul_Object_o)
+            self.update_selected_columns([DulHasParticipant.dul_Object_o.label("participant")])
         if select_columns:
-            self.selected_columns.append(UrdfHasBaseLink.urdf_Link_o.label("base_link"))
+            self.update_selected_columns([UrdfHasBaseLink.urdf_Link_o.label("base_link")])
         joins = {UrdfHasBaseLink: UrdfHasBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o}
         in_filters = {UrdfHasBaseLink.neem_id: [DulHasParticipant.neem_id]}
         self._update_joins_metadata(joins, in_filters)
         return self
 
     def join_task_time_interval(self, select_task: Optional[bool] = False,
-                                select_columns: Optional[bool] = False) -> 'NeemLoader':
+                                select_columns: Optional[bool] = True) -> 'NeemLoader':
         """
         Add time interval of tasks to the query,
         Assumes tasks have been joined/queried already if query_task is False,
@@ -338,21 +343,192 @@ class NeemLoader:
         :return: the modified query.
         """
         if select_task:
-            self.selected_columns.append(DulExecutesTask.dul_Task_o)
+            self.update_selected_columns([DulExecutesTask.dul_Task_o.label("task")])
         if select_columns:
-            self.selected_columns.append(SomaHasIntervalBegin.o.label("start_time"))
-            self.selected_columns.append(SomaHasIntervalEnd.o.label("end_time"))
+            self.update_selected_columns([SomaHasIntervalBegin.o.label("start_time"),
+                                          SomaHasIntervalEnd.o.label("end_time")])
 
         joins = {DulHasTimeInterval: DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
                  SomaHasIntervalBegin: SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
                  SomaHasIntervalEnd: SomaHasIntervalEnd.dul_TimeInterval_s == SomaHasIntervalBegin.dul_TimeInterval_s}
 
         in_filters = {DulHasTimeInterval.neem_id: [DulExecutesTask.neem_id],
-                   SomaHasIntervalBegin.neem_id: [DulExecutesTask.neem_id],
-                   SomaHasIntervalEnd.neem_id: [DulExecutesTask.neem_id]}
+                      SomaHasIntervalBegin.neem_id: [DulExecutesTask.neem_id],
+                      SomaHasIntervalEnd.neem_id: [DulExecutesTask.neem_id]}
 
         self._update_joins_metadata(joins, in_filters)
         return self
+
+    def join_tf_on_time_interval(self, select_columns: Optional[bool] = True,
+                                 select_time_interval: Optional[bool] = False,
+                                 begin_offset: Optional[float] = -40,
+                                 end_offset: Optional[float] = 0) -> 'NeemLoader':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already
+         if select_time_interval is False, else will select SomaHasIntervalBegin and SomaHasIntervalEnd first.
+        :param select_columns: whether to select data from this table or not.
+        :param select_time_interval: whether to select the time interval or not.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        if select_time_interval:
+            self.update_selected_columns([SomaHasIntervalBegin.o.label("start_time"),
+                                          SomaHasIntervalEnd.o.label("end_time")])
+        if select_columns:
+            self.select_tf_columns()
+
+        joins = {TfHeader: between(TfHeader.stamp,
+                                   SomaHasIntervalBegin.o + begin_offset,
+                                   SomaHasIntervalEnd.o + end_offset),
+                 Tf: Tf.header == TfHeader.ID}
+        self.update_joins(joins)
+        self.update_in_filters({Tf.neem_id: [SomaHasIntervalBegin.neem_id]})
+        return self
+
+    def join_tf_on_tasks(self, select_columns: Optional[bool] = True,
+                         select_task: Optional[bool] = False) -> 'NeemLoader':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes tasks have been joined/selected already if select_task is False,
+         else will select tasks first.
+        :param select_columns: whether to select data from this table or not.
+        :param select_task: whether to select the task or not.
+        :return: the modified query.
+        """
+        if select_task:
+            self.update_selected_columns(DulExecutesTask.dul_Task_o.label("task"))
+        if select_columns:
+            self.select_tf_columns()
+
+        joins = {Tf: Tf.neem_id == DulExecutesTask.neem_id,
+                 TfHeader: Tf.header == TfHeader.ID}
+        self.joins.update(joins)
+        return self
+
+    def join_tf_on_base_link(self, select_columns: Optional[bool] = True,
+                                select_base_link: Optional[bool] = False) -> 'NeemLoader':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes UrdfHasBaseLink has been joined/selected already if select_base_link is False,
+         else will select UrdfHasBaseLink first.
+        :param select_columns: whether to select data from this table or not.
+        :param select_base_link: whether to select the base link or not.
+        """
+        if select_base_link:
+            self.update_selected_columns(UrdfHasBaseLink.urdf_Link_o.label("base_link"))
+        if select_columns:
+            self.select_tf_columns()
+        joins = {Tf: Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
+                 TfHeader: Tf.header == TfHeader.ID}
+        self.update_joins(joins)
+        self.update_in_filters({Tf.neem_id: [UrdfHasBaseLink.neem_id]})
+        return self
+
+    def join_tf_transfrom(self, select_columns: Optional[bool] = True) -> 'NeemLoader':
+        """
+        Add transform data to the query.
+        :param select_columns: whether to select data from this table or not.
+        :return: the modified query.
+        """
+        if select_columns:
+            self.select_tf_transform_columns()
+        joins = {TfTransform: TfTransform.ID == Tf.ID,
+                 TransformTranslation: TransformTranslation.ID == TfTransform.translation,
+                 TransformRotation: TransformRotation.ID == TfTransform.rotation}
+        self.joins.update(joins)
+        return self
+
+    def filter_tf_by_base_link(self) -> 'NeemLoader':
+        """
+        Filter the tf data by base link.
+        :param base_link: the base link.
+        :return: the modified query.
+        """
+        return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
+
+    def update_joins(self, joins: Dict[Table, BinaryExpression]):
+        """
+        Update the joins' dictionary by adding a new join or updating an existing one with an additional condition.
+        :param joins: the joins' dictionary.
+        """
+        for table, on in joins.items():
+            if table in self.joins:
+                if on != self.joins[table]:
+                    self.joins[table] = and_(joins[table], on)
+            else:
+                self.joins[table] = on
+
+    def update_in_filters(self, in_filters: Dict[Column, List]):
+        """
+        Update the in_filters' dictionary by adding a new column or updating an existing one with additional values.
+        :param in_filters: the in_filters' dictionary.
+        """
+        self.update_filters(self.in_filters, in_filters)
+
+    def update_remove_filters(self, remove_filters: Dict[Column, List]):
+        """
+        Update the remove_filters' dictionary by adding a new column or updating an existing one with additional values.
+        :param remove_filters: the remove_filters' dictionary.
+        """
+        self.update_filters(self.remove_filters, remove_filters)
+
+    @staticmethod
+    def update_filters(filters: Dict[Column, List], updates: Dict[Column, List]):
+        """
+        Update the filters' dictionary by adding a new column or updating an existing one with additional values.
+        :param filters: the in_filters' dictionary.
+        :param updates: the updates' dictionary.
+        """
+        for col, values in updates.items():
+            if col in filters:
+                for value in values:
+                    if value not in filters[col]:
+                        filters[col].append(value)
+            else:
+                filters[col] = values
+
+    def select_tf_columns(self) -> 'NeemLoader':
+        """
+        Select tf data (transform, header, child_frame_id) to the query,
+        """
+        self.update_selected_columns([Tf.child_frame_id.label("child_frame_id"),
+                                      TfHeader.frame_id.label("frame_id"),
+                                      TfHeader.stamp.label("stamp")])
+        return self
+
+    def select_tf_transform_columns(self) -> 'NeemLoader':
+        """
+        Select tf transform data (translation, rotation) to the query,
+        """
+        self.update_selected_columns([TransformTranslation.x.label("x"),
+                                      TransformTranslation.y.label("y"),
+                                      TransformTranslation.z.label("z"),
+                                      TransformRotation.x.label("x"),
+                                      TransformRotation.y.label("y"),
+                                      TransformRotation.z.label("z"),
+                                      TransformRotation.w.label("w")])
+        return self
+
+    def update_selected_columns(self, columns: List[InstrumentedAttribute]) -> 'NeemLoader':
+        """
+        Update the selected columns.
+        :param columns: the columns.
+        :return: the modified query.
+        """
+        for col in columns:
+            if col not in self.selected_columns:
+                self.selected_columns.append(col)
+        return self
+
+    def table_exists(self, table: Table) -> bool:
+        """
+        Check if a table exists in the query.
+        :param table: the table.
+        :return: True if the table exists, False otherwise.
+        """
+        return table in self.joins or [col in self.selected_columns for col in table.ID.table.columns]
 
     def _update_joins_metadata(self, joins: Dict[Table, BinaryExpression],
                                in_filters: Optional[Dict[Column, List]] = None,
@@ -363,16 +539,44 @@ class NeemLoader:
         :param in_filters: the column values to include.
         :param remove_filters: the column values to remove.
         """
-        self.joins.update(joins)
-        self.in_filters.update(in_filters)
-        self.remove_filters.update(remove_filters)
+        if joins is not None:
+            self.update_joins(joins)
+        if in_filters is not None:
+            self.update_in_filters(in_filters)
+        if remove_filters is not None:
+            self.update_remove_filters(remove_filters)
 
-    def filter(self, in_: Optional[Dict[Column, List]] = None,
-               remove: Optional[Dict[Column, List]] = None) -> Select:
+    def join(self, table: Table, on: BinaryExpression,
+             select_columns: Optional[List] = None) -> 'NeemLoader':
+        """
+        Join a table.
+        :param table: the table.
+        :param on: the condition.
+        :param select_columns: the columns to select.
+        :return: the modified query.
+        """
+        if select_columns is not None:
+            self.selected_columns.extend(select_columns)
+        self.joins[table] = on
+        return self
+
+    def filter(self, *filters: BinaryExpression) -> 'NeemLoader':
+        """
+        Filter the query.
+        :param filters: the filters.
+        :return: the modified query.
+        """
+        self.filters.extend(filters)
+        return self
+
+    def _filter(self, in_: Optional[Dict[Column, List]] = None,
+                remove: Optional[Dict[Column, List]] = None,
+                filters: Optional[List[BinaryExpression]] = None) -> Select:
         """
         Filter the query.
         :param in_: the column values to include.
         :param remove: the column values to remove.
+        :param filters: the filters to apply.
         :return: the modified query.
         """
 
@@ -383,13 +587,15 @@ class NeemLoader:
                         return True
             return False
 
-        filters = []
+        all_filters = []
         if in_ is not None:
             filters.extend([col.in_(values) for col, values in in_.items() if check_values(values)])
         if remove is not None:
             filters.extend([not_(col.in_(values)) for col, values in remove.items() if check_values(values)])
-        if len(filters) > 0:
-            self.query = self.query.filter(*filters)
+        if filters is not None:
+            all_filters.extend(filters)
+        if len(all_filters) > 0:
+            self.query = self.query.filter(*all_filters)
         return self.query
 
     def select(self, *entities: InstrumentedAttribute) -> 'NeemLoader':
