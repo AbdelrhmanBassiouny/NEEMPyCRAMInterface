@@ -4,9 +4,11 @@ from sqlalchemy import Engine, text
 from typing_extensions import List, Iterable, Tuple, Optional
 
 from ..datastructures.pose import Pose, Transform
-from ..sql_neems.neem_alchemy import NeemAlchemy as na, TaskType, ParticipantType
+from ..sql_neems.neem_alchemy import NeemAlchemy, TaskType, ParticipantType
 from ..sql_neems.neems_database import *
 
+
+na = NeemAlchemy("mysql+pymysql://newuser:password@localhost/test")
 
 def get_dataframe_from_sql_query_file(sql_filename: str, engine: Engine) -> pd.DataFrame:
     """
@@ -59,12 +61,23 @@ def get_task_data(task: str) -> pd.DataFrame:
           join_tf_on_time_interval().
           join_tf_transfrom().join_neems().join_neems_environment().
           filter_tf_by_base_link().
-          filter_by_task_type(task, regexp=True)).get_result()
-    df.sort_values(by=['stamp'], inplace=True)
+          filter_by_task_type(task, regexp=True).order_by(TfHeader.stamp)).get_result()
     return df
 
 
-
+def get_plan_of_neem(neem_id: int) -> pd.DataFrame:
+    """
+    Get the task tree of a plan of a certain neem.
+    :param neem_id: The id in (ID) column of the Neems table.
+    :return: The task tree as a pandas dataframe.
+    """
+    df = (na.select(TaskType.o).select_from(DulExecutesTask).
+          join_task_types().
+          join_neems().
+          filter(Neem.ID == neem_id).
+          join_task_time_interval().
+          order_by(SomaHasIntervalBegin.o)).get_result()
+    return df
 
 
 def filter_by_neem_id(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:
