@@ -10,16 +10,15 @@ from unittest import TestCase
 class TestNeemSqlAlchemy(TestCase):
     nl: NeemLoader
 
-    @classmethod
-    def setUpClass(cls):
-        cls.nl = NeemLoader("mysql+pymysql://newuser:password@localhost/test")
+    def setUp(self):
+        self.nl = NeemLoader("mysql+pymysql://newuser:password@localhost/test")
 
     def tearDown(self):
         self.nl.reset()
 
     def test_sql_like(self):
         tasks = (self.nl.session.query(DulExecutesTask).
-                 _filter(DulExecutesTask.dul_Task_o.like("%Pour%")).first())
+                 filter(DulExecutesTask.dul_Task_o.like("%Pour%")).first())
         self.assertIsNotNone(tasks)
 
     def test_get_task_data(self):
@@ -31,33 +30,37 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(task_data)
 
     def test_join_task_participants(self):
-        task_participants = self.nl.join_task_participants(select_task=True)
+        task_participants = self.nl.join_task_participants(select_from_task=True)
         df = pd.read_sql_query(task_participants.statement, self.nl.engine)
         self.assertIsNotNone(df)
 
     def test_join_task_participant_types(self):
-        participant_types = self.nl.join_participant_types(select_participants=True)
+        participant_types = (self.nl.select(ParticipantType.o).
+                             select_from(DulHasParticipant).
+                             join_participant_types())
         df = pd.read_sql_query(participant_types.statement, self.nl.engine)
         self.assertIsNotNone(df)
 
     def test_join_task_types(self):
-        task_types = self.nl.join_task_types(select_tasks=True)
+        task_types = self.nl.join_task_types(select_from_tasks=True)
         df = pd.read_sql_query(task_types.statement, self.nl.engine)
         self.assertIsNotNone(df)
 
     def test_multi_join(self):
-        nl_query = (self.nl.join_task_types(select_tasks=True).
-                    join_task_participants().
+        nl_query = (self.nl.select(TfHeader.stamp).select_from(DulExecutesTask)
+                    .join_task_types().
+                    join_task_participants(select_columns=True).
                     join_participant_types().
                     join_participant_base_link().
                     join_task_time_interval().
-                    join_tf_on_time_interval())
-                    # filter_tf_by_base_link().
-                    # join_tf_transfrom())
-        stmt = nl_query.statement
-        print(stmt)
-        df = pd.read_sql_query(stmt, self.nl.engine)
-        print(df)
+                    join_tf_on_time_interval().
+                    filter_tf_by_base_link().
+                    join_tf_transfrom().join_neems().join_neems_environment())
+        df = self.nl.get_query_result_as_dataframe()
+        df.sort_values(by=['stamp'], inplace=True)
+        pd.set_option('display.float_format', lambda x: '%.3f' % x)
+        pd.set_option('display.max_columns', None)
+        print(df.head(100))
         self.assertIsNotNone(df)
 
     def test_get_neem(self):
