@@ -303,10 +303,10 @@ class NeemQuery:
         :return: the modified query.
         """
         joins = {type_table: and_(type_table.s == type_of_column,
-                                  type_table.neem_id == type_of_table.neem_id)}
-        remove_filters = {type_table.o: ["owl:NamedIndividual"]}
+                                  type_table.neem_id == type_of_table.neem_id,
+                                  type_table.o != "owl:NamedIndividual")}
         outer_join = {type_table: is_outer}
-        self._update_joins_metadata(joins, remove_filters, outer_joins=outer_join)
+        self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
     def join_participant_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':

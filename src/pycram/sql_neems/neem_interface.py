@@ -86,7 +86,8 @@ def get_plan_of_neem(neem_id: int) -> NeemQuery:
     :param neem_id: The id in (ID) column of the Neems table.
     """
     na_query = get_task_sequence_of_neem(neem_id)
-    na_query = na_query.join_task_participants().join_participant_types().select(ParticipantType.o.label('participant'))
+    na_query = (na_query.join_task_participants(is_outer=True).
+                join_participant_types(is_outer=True).select(ParticipantType.o.label('participant')))
     return na_query
 
 
