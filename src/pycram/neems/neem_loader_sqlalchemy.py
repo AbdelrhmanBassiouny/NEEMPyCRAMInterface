@@ -221,7 +221,7 @@ class NeemLoader:
         df = pd.read_sql(query.statement, self.engine)
         return df
 
-    def get_query_result_as_dataframe(self) -> pd.DataFrame:
+    def get_result(self) -> pd.DataFrame:
         """
         Get the data of the query as a dataframe.
         :param chunk_size: the size of the chunks, if None, will get the whole data at once.
@@ -229,7 +229,7 @@ class NeemLoader:
         """
         return pd.read_sql_query(self.statement, self.engine)
 
-    def get_query_result_as_dataframe_stream(self, chunk_size: Optional[int] = 500):
+    def get_result_in_chunks(self, chunk_size: Optional[int] = 500):
         """
         Get the data of the query as a dataframe in chunks.
         """
@@ -680,6 +680,17 @@ class NeemLoader:
             self.selected_columns.extend(select_columns)
         self.joins[table] = on
         return self
+
+    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemLoader':
+        """
+        Filter the query by task type.
+        :param task: the task type.
+        :return: the modified query.
+        """
+        if regexp:
+            return self.filter(TaskType.o.like(f"%{task}%"))
+        else:
+            return self.filter(TaskType.o == task)
 
     def filter(self, *filters: BinaryExpression) -> 'NeemLoader':
         """

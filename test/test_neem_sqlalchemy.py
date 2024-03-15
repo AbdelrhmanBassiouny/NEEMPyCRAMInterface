@@ -1,10 +1,9 @@
+from unittest import TestCase
+
 import pandas as pd
-from sqlalchemy import Select, select
-from sqlalchemy.orm import Query
 
 from pycram.neems.neem_loader_sqlalchemy import NeemLoader, TaskType, ParticipantType
-from  pycram.neems.neems_database import *
-from unittest import TestCase
+from pycram.neems.neems_database import *
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -30,33 +29,32 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(task_data)
 
     def test_join_task_participants(self):
-        task_participants = self.nl.join_task_participants(select_from_task=True)
-        df = pd.read_sql_query(task_participants.statement, self.nl.engine)
+        df = (self.nl.select_from(DulExecutesTask).
+              join_task_participants()).get_result()
         self.assertIsNotNone(df)
 
     def test_join_task_participant_types(self):
-        participant_types = (self.nl.select(ParticipantType.o).
-                             select_from(DulHasParticipant).
-                             join_participant_types())
-        df = pd.read_sql_query(participant_types.statement, self.nl.engine)
+        df = (self.nl.select_from(DulHasParticipant).
+              join_participant_types()).get_result()
         self.assertIsNotNone(df)
 
     def test_join_task_types(self):
-        task_types = self.nl.join_task_types(select_from_tasks=True)
-        df = pd.read_sql_query(task_types.statement, self.nl.engine)
+        df = (self.nl.select(DulExecutesTask.dul_Task_o).
+              join_task_types()).get_result()
         self.assertIsNotNone(df)
 
     def test_multi_join(self):
-        nl_query = (self.nl.select(TfHeader.stamp).select_from(DulExecutesTask)
-                    .join_task_types().
-                    join_task_participants(select_columns=True).
-                    join_participant_types().
-                    join_participant_base_link().
-                    join_task_time_interval().
-                    join_tf_on_time_interval().
-                    filter_tf_by_base_link().
-                    join_tf_transfrom().join_neems().join_neems_environment())
-        df = self.nl.get_query_result_as_dataframe()
+        df = (self.nl.select(TfHeader.stamp, ParticipantType.o.label("particpant")).
+              select_from(DulExecutesTask).
+              join_task_types().
+              join_task_participants().
+              join_participant_types().
+              join_participant_base_link().
+              join_task_time_interval().
+              join_tf_on_time_interval().
+              join_tf_transfrom().join_neems().join_neems_environment().
+              filter_tf_by_base_link().
+              filter_by_task_type("Pour", regexp=True)).get_result()
         df.sort_values(by=['stamp'], inplace=True)
         pd.set_option('display.float_format', lambda x: '%.3f' % x)
         pd.set_option('display.max_columns', None)
@@ -70,4 +68,3 @@ class TestNeemSqlAlchemy(TestCase):
     def test_get_neem_ids(self):
         neem_ids = self.nl.session.query(Neem._id).all()
         self.assertIsNotNone(neem_ids)
-
