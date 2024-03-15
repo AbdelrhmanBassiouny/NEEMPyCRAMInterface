@@ -44,7 +44,8 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(df)
 
     def test_multi_join(self):
-        df = (self.nl.select(TfHeader.stamp, ParticipantType.o.label("particpant")).
+        df = (self.nl.select(TfHeader.stamp,
+                             ParticipantType.o.label("particpant")).
               select_from(DulExecutesTask).
               join_task_types().
               join_task_participants().
@@ -58,7 +59,7 @@ class TestNeemSqlAlchemy(TestCase):
         df.sort_values(by=['stamp'], inplace=True)
         pd.set_option('display.float_format', lambda x: '%.3f' % x)
         pd.set_option('display.max_columns', None)
-        print(df.head(100))
+        print(df)
         self.assertIsNotNone(df)
 
     def test_get_neem(self):

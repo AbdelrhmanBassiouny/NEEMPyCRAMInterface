@@ -258,123 +258,64 @@ class NeemLoader:
             self.query = self.query.order_by(self._order_by)
         return self._filter(self.in_filters, self.remove_filters, self.filters)
 
-    def join_task_participants(self, participants: Optional[List[str]] = None,
-                               select_from_task: Optional[bool] = False,
-                               select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_task_participants(self) -> 'NeemLoader':
         """
         Add task participant_types to the query,
-        Assumes tasks have been joined/selected already if select_from_task is False,
-         else will select tasks first.
-        :param participants: the participant_types.
-        :param select_from_task: whether to select the task or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes tasks have been joined/selected already.
         :return: the modified query.
         """
-        if select_from_task:
-            self.update_select_from_tables([DulExecutesTask.dul_Task_o.label("task")])
-        if select_columns:
-            self.update_selected_columns([DulHasParticipant.dul_Object_o.label("participant")])
         joins = {DulHasParticipant: DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s}
-        in_filters = {DulHasParticipant.dul_Object_o: participants,
-                      DulHasParticipant.neem_id: [DulExecutesTask.neem_id]}
+        in_filters = {DulHasParticipant.neem_id: [DulExecutesTask.neem_id]}
         self._update_joins_metadata(joins, in_filters)
         return self
 
-    def join_participant_types(self, participant_types: Optional[List[str]] = None,
-                               remove_participant_types: Optional[List[str]] = None,
-                               select_from_participants: Optional[bool] = False,
-                               select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_participant_types(self) -> 'NeemLoader':
         """
         Add participant types to the query,
-        Assumes participant_types have been joined/selected already if select_from_participants is False,
-         else will select participant_types first.
-        :param participant_types: the participant_types to include.
-        :param remove_participant_types: the participant_types to remove.
-        :param select_from_participants: whether to select participant_types or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes participant_types have been joined/selected already.
         :return: the modified query.
         """
-        if select_from_participants:
-            self.update_select_from_tables([DulHasParticipant])
-        if select_columns:
-            self.update_selected_columns([ParticipantType.o.label("participant_type")])
-        if remove_participant_types is None:
-            remove_participant_types = ["owl:NamedIndividual"]
-        else:
-            remove_participant_types.append("owl:NamedIndividual")
+        return self.join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o)
 
-        joins = {ParticipantType: ParticipantType.s == DulHasParticipant.dul_Object_o}
-        in_filters = {ParticipantType.o: participant_types,
-                      ParticipantType.neem_id: [DulHasParticipant.neem_id]}
-        remove_filters = {ParticipantType.o: remove_participant_types}
-        self._update_joins_metadata(joins, in_filters, remove_filters)
-        return self
-
-    def join_task_types(self, tasks: Optional[List[str]] = None,
-                        remove_tasks: Optional[List[str]] = None,
-                        select_from_tasks: Optional[bool] = False,
-                        select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_task_types(self) -> 'NeemLoader':
         """
         Add task types to the query,
-        Assumes tasks have been joined/selected already if select_tasks is False,
-         else will select tasks first.
-        :param tasks: the tasks to include.
-        :param remove_tasks: the tasks to remove.
-        :param select_from_tasks: whether to select the task or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes tasks have been joined/selected already.
         :return: the modified query.
         """
-        if select_from_tasks:
-            self.update_select_from_tables([DulExecutesTask])
-        if select_columns:
-            self.update_selected_columns([TaskType.o.label("task")])
-        if remove_tasks is None:
-            remove_tasks = ["owl:NamedIndividual"]
-        else:
-            remove_tasks.append("owl:NamedIndividual")
+        return self.join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o)
 
-        joins = {TaskType: TaskType.s == DulExecutesTask.dul_Task_o}
-        in_filters = {TaskType.o: tasks,
-                      TaskType.neem_id: [DulExecutesTask.neem_id]}
-        remove_filters = {TaskType.o: remove_tasks}
+    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column) -> 'NeemLoader':
+        """
+        Join a type table.
+        :param type_table: the type table.
+        :param type_of_table: the table to join on.
+        :param type_of_column: the column to join on.
+        :return: the modified query.
+        """
+        joins = {type_table: type_table.s == type_of_column}
+        in_filters = {type_table.neem_id: [type_of_table.neem_id]}
+        remove_filters = {type_table.o: ["owl:NamedIndividual"]}
         self._update_joins_metadata(joins, in_filters, remove_filters)
         return self
 
-    def join_participant_base_link(self, select_from_participants: Optional[bool] = False,
-                                   select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_participant_base_link(self) -> 'NeemLoader':
         """
         Add base links of participant_types to the query,
-        Assumes participant_types have been joined/selected already if select_from_participants is False,
-         else will select participant_types first.
-        :param select_from_participants: whether to select participant_types or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes participant_types have been joined/selected already.
         :return: the modified query.
         """
-        if select_from_participants:
-            self.update_select_from_tables([DulHasParticipant])
-        if select_columns:
-            self.update_selected_columns([UrdfHasBaseLink.urdf_Link_o.label("base_link")])
         joins = {UrdfHasBaseLink: UrdfHasBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o}
         in_filters = {UrdfHasBaseLink.neem_id: [DulHasParticipant.neem_id]}
         self._update_joins_metadata(joins, in_filters)
         return self
 
-    def join_task_time_interval(self, select_from_task: Optional[bool] = False,
-                                select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_task_time_interval(self) -> 'NeemLoader':
         """
         Add time interval of tasks to the query,
-        Assumes tasks have been joined/queried already if query_task is False,
-         else will query task first.
-        :param select_from_task: whether to select tasks or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes tasks have been joined/queried already.
         :return: the modified query.
         """
-        if select_from_task:
-            self.update_select_from_tables([DulExecutesTask])
-        if select_columns:
-            self.update_selected_columns([SomaHasIntervalBegin.o.label("start_time"),
-                                          SomaHasIntervalEnd.o.label("end_time")])
-
         joins = {DulHasTimeInterval: DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
                  SomaHasIntervalBegin: SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
                  SomaHasIntervalEnd: SomaHasIntervalEnd.dul_TimeInterval_s == SomaHasIntervalBegin.dul_TimeInterval_s}
@@ -386,25 +327,15 @@ class NeemLoader:
         self._update_joins_metadata(joins, in_filters)
         return self
 
-    def join_tf_on_time_interval(self, select_columns: Optional[bool] = False,
-                                 select_from_time_interval: Optional[bool] = False,
-                                 begin_offset: Optional[float] = -40,
+    def join_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
                                  end_offset: Optional[float] = 0) -> 'NeemLoader':
         """
         Add tf data (transform, header, child_frame_id) to the query,
-        Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already
-         if select_time_interval is False, else will select SomaHasIntervalBegin and SomaHasIntervalEnd first.
-        :param select_columns: whether to select data from this table or not.
-        :param select_from_time_interval: whether to select the time interval or not.
+        Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
         :return: the modified query.
         """
-        if select_from_time_interval:
-            self.update_select_from_tables([SomaHasIntervalBegin, SomaHasIntervalEnd])
-        if select_columns:
-            self.select_tf_columns()
-
         joins = {TfHeader: between(TfHeader.stamp,
                                    SomaHasIntervalBegin.o + begin_offset,
                                    SomaHasIntervalEnd.o + end_offset),
@@ -413,83 +344,51 @@ class NeemLoader:
         self.update_in_filters({Tf.neem_id: [SomaHasIntervalBegin.neem_id]})
         return self
 
-    def join_tf_on_tasks(self, select_columns: Optional[bool] = False,
-                         select_from_task: Optional[bool] = False) -> 'NeemLoader':
+    def join_tf_on_tasks(self) -> 'NeemLoader':
         """
         Add tf data (transform, header, child_frame_id) to the query,
-        Assumes tasks have been joined/selected already if select_from_task is False,
-         else will select tasks first.
-        :param select_columns: whether to select data from this table or not.
-        :param select_from_task: whether to select the task or not.
+        Assumes tasks have been joined/selected already.
         :return: the modified query.
         """
-        if select_from_task:
-            self.update_select_from_tables([DulExecutesTask])
-        if select_columns:
-            self.select_tf_columns()
-
         joins = {Tf: Tf.neem_id == DulExecutesTask.neem_id,
                  TfHeader: Tf.header == TfHeader.ID}
         self.joins.update(joins)
         return self
 
-    def join_tf_on_base_link(self, select_columns: Optional[bool] = False,
-                             select_from_base_link: Optional[bool] = False) -> 'NeemLoader':
+    def join_tf_on_base_link(self) -> 'NeemLoader':
         """
         Add tf data (transform, header, child_frame_id) to the query,
-        Assumes UrdfHasBaseLink has been joined/selected already if select_from_base_link is False,
-         else will select UrdfHasBaseLink first.
-        :param select_columns: whether to select data from this table or not.
-        :param select_from_base_link: whether to select the base link or not.
+        Assumes UrdfHasBaseLink has been joined/selected already.
         """
-        if select_from_base_link:
-            self.update_select_from_tables([UrdfHasBaseLink])
-        if select_columns:
-            self.select_tf_columns()
         joins = {Tf: Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
                  TfHeader: Tf.header == TfHeader.ID}
         self.update_joins(joins)
         self.update_in_filters({Tf.neem_id: [UrdfHasBaseLink.neem_id]})
         return self
 
-    def join_tf_transfrom(self, select_from_tf: Optional[bool] = False,
-                          select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_tf_transfrom(self) -> 'NeemLoader':
         """
         Add transform data to the query.
-        Assumes tf has been joined/selected already if select_from_tf is False,
-            else will select tf first.
-        :param select_from_tf: whether to select tf or not.
-        :param select_columns: whether to select data from this table or not.
+        Assumes tf has been joined/selected already.
         :return: the modified query.
         """
-        if select_from_tf:
-            self.update_select_from_tables([Tf])
-        if select_columns:
-            self.select_tf_transform_columns()
         joins = {TfTransform: TfTransform.ID == Tf.ID,
                  TransformTranslation: TransformTranslation.ID == TfTransform.translation,
                  TransformRotation: TransformRotation.ID == TfTransform.rotation}
         self.joins.update(joins)
         return self
 
-    def filter_tf_by_base_link(self, select_base_link: Optional[bool] = False) -> 'NeemLoader':
+    def filter_tf_by_base_link(self) -> 'NeemLoader':
         """
-        Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already
-         if select_base_link is False, else will select UrdfHasBaseLink first.
-        :param select_base_link: whether to select the base link or not.
-        :param base_link: the base link.
+        Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already.
         :return: the modified query.
         """
-        if select_base_link:
-            self.update_select_from_tables([UrdfHasBaseLink])
         return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
 
-    def join_neems(self, on: Optional[BinaryExpression] = None,
-                   select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemLoader':
         """
         Join the neem table, if on is None, will join on the neem_id column of any table that has it.
         :param on: the condition to join on.
-        :param select_columns: whether to select data from this table or not.
         :return: the modified query.
         """
         if on is None:
@@ -499,8 +398,6 @@ class NeemLoader:
                               " and no neem_id was found in the already joined/selected tables")
                 raise ValueError("No neem_id found in the tables")
             on = Neem._id == neem_id
-        if select_columns:
-            self.update_selected_columns([Neem._id.label("neem_id")])
         joins = {Neem: on}
         self.update_joins(joins)
         return self
@@ -522,19 +419,11 @@ class NeemLoader:
                     break
         return neem_id
 
-    def join_neems_environment(self, select_neem: Optional[bool] = False,
-                               select_columns: Optional[bool] = False) -> 'NeemLoader':
+    def join_neems_environment(self) -> 'NeemLoader':
         """
-        Join the neems environment index table. Assumes neem has been joined/selected already if select_neem is False,
-            else will select neem first.
-        :param select_neem: whether to select the neem or not.
-        :param select_columns: whether to select data from this table or not.
+        Join the neems environment index table. Assumes neem has been joined/selected already.
         :return: the modified query.
         """
-        if select_neem:
-            self.update_select_from_tables([Neem])
-        if select_columns:
-            self.update_selected_columns([NeemsEnvironmentIndex.environment_values])
         joins = {NeemsEnvironmentIndex: NeemsEnvironmentIndex.neems_ID == Neem.ID}
         self.update_joins(joins)
         return self
@@ -685,12 +574,39 @@ class NeemLoader:
         """
         Filter the query by task type.
         :param task: the task type.
+        :param regexp: whether to use regex to filter the task type or not (will use the sql like operator).
+        :return: the modified query.
+        """
+        return self.filter_by_type(TaskType, task, regexp)
+
+    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemLoader':
+        """
+        Filter the query by participant type.
+        :param participant: the participant type.
+        :param regexp: whether to use regex to filter the participant type or not (will use the sql like operator).
+        :return: the modified query.
+        """
+        return self.filter_by_type(ParticipantType, participant, regexp)
+
+    def filter_by_type(self, type_table: Table, type_: str,
+                       regexp: Optional[bool] = False,
+                       use_not_: Optional[bool] = False) -> 'NeemLoader':
+        """
+        Filter the query by type.
+        :param type_table: the type table.
+        :param type_: the type.
+        :param regexp: whether to use regex to filter the type or not (will use the sql like operator).
+        :param use_not_: whether to negate the filter or not.
         :return: the modified query.
         """
         if regexp:
-            return self.filter(TaskType.o.like(f"%{task}%"))
+            cond = type_table.o.like(f"%{type_}%")
         else:
-            return self.filter(TaskType.o == task)
+            cond = type_table.o == type_
+        if use_not_:
+            cond = not_(cond)
+        self.filters.append(cond)
+        return self
 
     def filter(self, *filters: BinaryExpression) -> 'NeemLoader':
         """
