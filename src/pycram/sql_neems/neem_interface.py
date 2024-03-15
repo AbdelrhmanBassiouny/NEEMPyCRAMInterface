@@ -1,14 +1,14 @@
 import pandas as pd
 import rospy
 from sqlalchemy import Engine, text
-from typing_extensions import List, Iterable, Tuple, Optional
+from typing_extensions import List, Tuple, Optional
 
 from ..datastructures.pose import Pose, Transform
-from ..sql_neems.neem_alchemy import NeemAlchemy, TaskType, ParticipantType
+from ..sql_neems.neem_query import NeemQuery, TaskType, ParticipantType
 from ..sql_neems.neems_database import *
 
+na = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
 
-na = NeemAlchemy("mysql+pymysql://newuser:password@localhost/test")
 
 def get_dataframe_from_sql_query_file(sql_filename: str, engine: Engine) -> pd.DataFrame:
     """
@@ -65,19 +65,30 @@ def get_task_data(task: str) -> pd.DataFrame:
     return df
 
 
-def get_plan_of_neem(neem_id: int) -> pd.DataFrame:
+def get_task_sequence_of_neem(neem_id: int) -> NeemQuery:
     """
     Get the task tree of a plan of a certain neem.
     :param neem_id: The id in (ID) column of the Neems table.
     :return: The task tree as a pandas dataframe.
     """
-    df = (na.select(TaskType.o).select_from(DulExecutesTask).
-          join_task_types().
-          join_neems().
-          filter(Neem.ID == neem_id).
-          join_task_time_interval().
-          order_by(SomaHasIntervalBegin.o)).get_result()
-    return df
+    na_query = (na.select(TaskType.o.label('task')).select_time_columns().select_from(DulExecutesTask).
+                join_task_types().
+                join_neems().
+                filter(Neem.ID == neem_id).
+                join_task_time_interval().
+                order_by(SomaHasIntervalBegin.o))
+    return na_query
+
+
+def get_plan_of_neem(neem_id: int) -> NeemQuery:
+    """
+    Get the complete cram plan of a neem given the neem ID.
+    :param neem_id: The id in (ID) column of the Neems table.
+    """
+    na_query = get_task_sequence_of_neem(neem_id)
+    na_query = na_query.join_task_participants().join_participant_types().select(ParticipantType.o.label('participant'))
+    return na_query
+
 
 
 def filter_by_neem_id(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:

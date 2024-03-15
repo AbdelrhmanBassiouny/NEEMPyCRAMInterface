@@ -2,15 +2,15 @@ from unittest import TestCase
 
 import pandas as pd
 
-from pycram.sql_neems.neem_alchemy import NeemAlchemy, TaskType, ParticipantType
+from pycram.sql_neems.neem_query import NeemQuery, TaskType, ParticipantType
 from pycram.sql_neems.neems_database import *
 
 
 class TestNeemSqlAlchemy(TestCase):
-    nl: NeemAlchemy
+    nl: NeemQuery
 
     def setUp(self):
-        self.nl = NeemAlchemy("mysql+pymysql://newuser:password@localhost/test")
+        self.nl = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
 
     def tearDown(self):
         self.nl.reset()
@@ -42,6 +42,14 @@ class TestNeemSqlAlchemy(TestCase):
         df = (self.nl.select(DulExecutesTask.dul_Task_o).
               join_task_types()).get_result()
         self.assertIsNotNone(df)
+
+    def test_outer_join(self):
+        outer_df = (self.nl.select(DulExecutesTask.dul_Task_o).
+              join_task_participants(is_outer=True)).get_result()
+        self.nl.reset()
+        df = (self.nl.select(DulExecutesTask.dul_Task_o).
+              join_task_participants(is_outer=False)).get_result()
+        self.assertIsNotNone(len(df) < len(outer_df))
 
     def test_multi_join(self):
         df = (self.nl.select(TfHeader.stamp,

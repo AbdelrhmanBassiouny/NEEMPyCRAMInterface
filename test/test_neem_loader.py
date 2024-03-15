@@ -36,8 +36,13 @@ class TestNeemLoader(TestCase):
         self.assertIsInstance(participants, list)
         self.assertTrue(len(participants) > 0)
 
+    def test_get_task_sequence_of_neem(self):
+        df = nl.get_task_sequence_of_neem(2).get_result()
+        print(df)
+        self.assertIsInstance(df, pd.DataFrame)
+
     def test_get_plan_of_neem(self):
-        df = nl.get_plan_of_neem(2)
+        df = nl.get_plan_of_neem(2).get_result()
         print(df)
         self.assertIsInstance(df, pd.DataFrame)
 

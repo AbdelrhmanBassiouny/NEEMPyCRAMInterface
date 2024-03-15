@@ -12,7 +12,7 @@ TaskType = aliased(RdfType)
 ParticipantType = aliased(RdfType)
 
 
-class NeemAlchemy:
+class NeemQuery:
     """
     A class to query the neems database using sqlalchemy.
     """
@@ -27,6 +27,7 @@ class NeemAlchemy:
         self.joins: Optional[Dict[Table, BinaryExpression]] = {}
         self.in_filters: Optional[Dict[Column, List]] = {}
         self.remove_filters: Optional[Dict[Column, List]] = {}
+        self.outer_joins: Optional[Dict[Table, bool]] = {}
         self.filters: Optional[List[BinaryExpression]] = []
         self._limit: Optional[int] = None
         self._order_by: Optional[Column] = None
@@ -254,84 +255,93 @@ class NeemAlchemy:
             else:
                 self.query = self.query.select_from(*self.select_from_tables)
         for table, on in self.joins.items():
-            self.query = self.query.join(table, on)
+            self.query = self.query.join(table, on, isouter=self.outer_joins.get(table, False))
         if self._limit is not None:
             self.query = self.query.limit(self._limit)
         if self._order_by is not None:
             self.query = self.query.order_by(self._order_by)
         return self._filter(self.in_filters, self.remove_filters, self.filters)
 
-    def join_task_participants(self) -> 'NeemAlchemy':
+    def join_task_participants(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add task participant_types to the query,
         Assumes tasks have been joined/selected already.
         :return: the modified query.
         """
-        joins = {DulHasParticipant: DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s}
-        in_filters = {DulHasParticipant.neem_id: [DulExecutesTask.neem_id]}
-        self._update_joins_metadata(joins, in_filters)
+        joins = {DulHasParticipant: and_(DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s,
+                                         DulHasParticipant.neem_id == DulExecutesTask.neem_id)}
+        outer_join = {DulHasParticipant: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
-    def join_participant_types(self) -> 'NeemAlchemy':
+    def join_participant_types(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add participant types to the query,
         Assumes participant_types have been joined/selected already.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        return self.join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o)
+        return self.join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o, is_outer=is_outer)
 
-    def join_task_types(self) -> 'NeemAlchemy':
+    def join_task_types(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add task types to the query,
         Assumes tasks have been joined/selected already.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        return self.join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o)
+        return self.join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o, is_outer=is_outer)
 
-    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column) -> 'NeemAlchemy':
+    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column,
+                  is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join a type table.
         :param type_table: the type table.
         :param type_of_table: the table to join on.
         :param type_of_column: the column to join on.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {type_table: type_table.s == type_of_column}
-        in_filters = {type_table.neem_id: [type_of_table.neem_id]}
+        joins = {type_table: and_(type_table.s == type_of_column,
+                                  type_table.neem_id == type_of_table.neem_id)}
         remove_filters = {type_table.o: ["owl:NamedIndividual"]}
-        self._update_joins_metadata(joins, in_filters, remove_filters)
+        outer_join = {type_table: is_outer}
+        self._update_joins_metadata(joins, remove_filters, outer_joins=outer_join)
         return self
 
-    def join_participant_base_link(self) -> 'NeemAlchemy':
+    def join_participant_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add base links of participant_types to the query,
         Assumes participant_types have been joined/selected already.
         :return: the modified query.
         """
-        joins = {UrdfHasBaseLink: UrdfHasBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o}
-        in_filters = {UrdfHasBaseLink.neem_id: [DulHasParticipant.neem_id]}
-        self._update_joins_metadata(joins, in_filters)
+        joins = {UrdfHasBaseLink: and_(UrdfHasBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                                       UrdfHasBaseLink.neem_id == DulHasParticipant.neem_id)}
+        outer_join = {UrdfHasBaseLink: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
-    def join_task_time_interval(self) -> 'NeemAlchemy':
+    def join_task_time_interval(self) -> 'NeemQuery':
         """
         Add time interval of tasks to the query,
         Assumes tasks have been joined/queried already.
         :return: the modified query.
         """
-        joins = {DulHasTimeInterval: DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
-                 SomaHasIntervalBegin: SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
-                 SomaHasIntervalEnd: SomaHasIntervalEnd.dul_TimeInterval_s == SomaHasIntervalBegin.dul_TimeInterval_s}
+        joins = {DulHasTimeInterval:
+                     and_(DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
+                          DulHasTimeInterval.neem_id == DulExecutesTask.neem_id),
+                 SomaHasIntervalBegin:
+                     and_(SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
+                          SomaHasIntervalBegin.neem_id == DulExecutesTask.neem_id),
+                 SomaHasIntervalEnd:
+                     and_(SomaHasIntervalEnd.dul_TimeInterval_s == SomaHasIntervalBegin.dul_TimeInterval_s,
+                          SomaHasIntervalEnd.neem_id == DulExecutesTask.neem_id)}
 
-        in_filters = {DulHasTimeInterval.neem_id: [DulExecutesTask.neem_id],
-                      SomaHasIntervalBegin.neem_id: [DulExecutesTask.neem_id],
-                      SomaHasIntervalEnd.neem_id: [DulExecutesTask.neem_id]}
-
-        self._update_joins_metadata(joins, in_filters)
+        self.update_joins(joins)
         return self
 
     def join_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                 end_offset: Optional[float] = 0) -> 'NeemAlchemy':
+                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
@@ -342,12 +352,12 @@ class NeemAlchemy:
         joins = {TfHeader: between(TfHeader.stamp,
                                    SomaHasIntervalBegin.o + begin_offset,
                                    SomaHasIntervalEnd.o + end_offset),
-                 Tf: Tf.header == TfHeader.ID}
+                 Tf: and_(Tf.header == TfHeader.ID,
+                          Tf.neem_id == SomaHasIntervalBegin.neem_id), }
         self.update_joins(joins)
-        self.update_in_filters({Tf.neem_id: [SomaHasIntervalBegin.neem_id]})
         return self
 
-    def join_tf_on_tasks(self) -> 'NeemAlchemy':
+    def join_tf_on_tasks(self) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes tasks have been joined/selected already.
@@ -355,21 +365,23 @@ class NeemAlchemy:
         """
         joins = {Tf: Tf.neem_id == DulExecutesTask.neem_id,
                  TfHeader: Tf.header == TfHeader.ID}
-        self.joins.update(joins)
+        self.update_joins(joins)
         return self
 
-    def join_tf_on_base_link(self) -> 'NeemAlchemy':
+    def join_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes UrdfHasBaseLink has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
         """
-        joins = {Tf: Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
+        joins = {Tf: and_(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
+                          Tf.neem_id == UrdfHasBaseLink.neem_id),
                  TfHeader: Tf.header == TfHeader.ID}
-        self.update_joins(joins)
-        self.update_in_filters({Tf.neem_id: [UrdfHasBaseLink.neem_id]})
+        outer_join = {Tf: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
-    def join_tf_transfrom(self) -> 'NeemAlchemy':
+    def join_tf_transfrom(self) -> 'NeemQuery':
         """
         Add transform data to the query.
         Assumes tf has been joined/selected already.
@@ -378,17 +390,17 @@ class NeemAlchemy:
         joins = {TfTransform: TfTransform.ID == Tf.ID,
                  TransformTranslation: TransformTranslation.ID == TfTransform.translation,
                  TransformRotation: TransformRotation.ID == TfTransform.rotation}
-        self.joins.update(joins)
+        self.update_joins(joins)
         return self
 
-    def filter_tf_by_base_link(self) -> 'NeemAlchemy':
+    def filter_tf_by_base_link(self) -> 'NeemQuery':
         """
         Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already.
         :return: the modified query.
         """
         return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
 
-    def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemAlchemy':
+    def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemQuery':
         """
         Join the neem table, if on is None, will join on the neem_id column of any table that has it.
         :param on: the condition to join on.
@@ -427,7 +439,7 @@ class NeemAlchemy:
                     break
         return neem_id
 
-    def join_neems_environment(self) -> 'NeemAlchemy':
+    def join_neems_environment(self) -> 'NeemQuery':
         """
         Join the neems_environment_index table. Assumes neem has been joined/selected already.
         :return: the modified query.
@@ -436,7 +448,7 @@ class NeemAlchemy:
         self.update_joins(joins)
         return self
 
-    def limit(self, limit: int) -> 'NeemAlchemy':
+    def limit(self, limit: int) -> 'NeemQuery':
         """
         Limit the query results.
         :param limit: the limit.
@@ -445,7 +457,7 @@ class NeemAlchemy:
         self._limit = limit
         return self
 
-    def order_by(self, column: Column) -> 'NeemAlchemy':
+    def order_by(self, column: Column) -> 'NeemQuery':
         """
         Order the query results. (It's recommended to use this after having the dataframe in pandas to
          avoid long query times)
@@ -454,6 +466,85 @@ class NeemAlchemy:
         """
         self._order_by = column
         return self
+
+    def select_tf_columns(self) -> 'NeemQuery':
+        """
+        Select tf data (transform, header, child_frame_id) to the query,
+        """
+        self.update_selected_columns([Tf.child_frame_id.label("child_frame_id"),
+                                      TfHeader.frame_id.label("frame_id"),
+                                      TfHeader.stamp.label("stamp")])
+        return self
+
+    def select_tf_transform_columns(self) -> 'NeemQuery':
+        """
+        Select tf transform data (translation, rotation) to the query,
+        """
+        self.update_selected_columns([TransformTranslation.x.label("tx"),
+                                      TransformTranslation.y.label("ty"),
+                                      TransformTranslation.z.label("tz"),
+                                      TransformRotation.x.label("qx"),
+                                      TransformRotation.y.label("qy"),
+                                      TransformRotation.z.label("qz"),
+                                      TransformRotation.w.label("qw")])
+        return self
+
+    def select_time_columns(self) -> 'NeemQuery':
+        """
+        Select time columns to the query,
+        """
+        self.update_selected_columns([SomaHasIntervalBegin.o.label("begin"),
+                                      SomaHasIntervalEnd.o.label("end")])
+        return self
+
+    def update_select_from_tables(self, tables: List[Table]) -> 'NeemQuery':
+        """
+        Update the selected tables.
+        :param tables: the tables.
+        :return: the modified query.
+        """
+        for table in tables:
+            if table not in self.select_from_tables:
+                self.select_from_tables.append(table)
+        return self
+
+    def update_selected_columns(self, columns: List[InstrumentedAttribute]) -> 'NeemQuery':
+        """
+        Update the selected columns.
+        :param columns: the columns.
+        :return: the modified query.
+        """
+        for col in columns:
+            if col not in self.selected_columns:
+                self.selected_columns.append(col)
+        return self
+
+    def table_exists(self, table: Table) -> bool:
+        """
+        Check if a table exists in the query.
+        :param table: the table.
+        :return: True if the table exists, False otherwise.
+        """
+        return table in self.joins or [col in self.selected_columns for col in table.ID.table.columns]
+
+    def _update_joins_metadata(self, joins: Dict[Table, BinaryExpression],
+                               in_filters: Optional[Dict[Column, List]] = None,
+                               remove_filters: Optional[Dict[Column, List]] = None,
+                               outer_joins: Optional[Dict[Table, bool]] = None):
+        """
+        Update the joins' metadata.
+        :param joins: the joins.
+        :param in_filters: the column values to include.
+        :param remove_filters: the column values to remove.
+        """
+        if joins is not None:
+            self.update_joins(joins)
+        if in_filters is not None:
+            self.update_in_filters(in_filters)
+        if remove_filters is not None:
+            self.update_remove_filters(remove_filters)
+        if outer_joins is not None:
+            self.update_outer_joins(outer_joins)
 
     def update_joins(self, joins: Dict[Table, BinaryExpression]):
         """
@@ -481,6 +572,13 @@ class NeemAlchemy:
         """
         self.update_filters(self.remove_filters, remove_filters)
 
+    def update_outer_joins(self, outer_joins: Dict[Table, bool]):
+        """
+        Update the outer_joins' dictionary.
+        :param outer_joins: the outer_joins' dictionary.
+        """
+        self.outer_joins.update(outer_joins)
+
     @staticmethod
     def update_filters(filters: Dict[Column, List], updates: Dict[Column, List]):
         """
@@ -496,89 +594,17 @@ class NeemAlchemy:
             else:
                 filters[col] = values
 
-    def select_tf_columns(self) -> 'NeemAlchemy':
-        """
-        Select tf data (transform, header, child_frame_id) to the query,
-        """
-        self.update_selected_columns([Tf.child_frame_id.label("child_frame_id"),
-                                      TfHeader.frame_id.label("frame_id"),
-                                      TfHeader.stamp.label("stamp")])
-        return self
-
-    def select_tf_transform_columns(self) -> 'NeemAlchemy':
-        """
-        Select tf transform data (translation, rotation) to the query,
-        """
-        self.update_selected_columns([TransformTranslation.x.label("x"),
-                                      TransformTranslation.y.label("y"),
-                                      TransformTranslation.z.label("z"),
-                                      TransformRotation.x.label("x"),
-                                      TransformRotation.y.label("y"),
-                                      TransformRotation.z.label("z"),
-                                      TransformRotation.w.label("w")])
-        return self
-
-    def update_select_from_tables(self, tables: List[Table]) -> 'NeemAlchemy':
-        """
-        Update the selected tables.
-        :param tables: the tables.
-        :return: the modified query.
-        """
-        for table in tables:
-            if table not in self.select_from_tables:
-                self.select_from_tables.append(table)
-        return self
-
-    def update_selected_columns(self, columns: List[InstrumentedAttribute]) -> 'NeemAlchemy':
-        """
-        Update the selected columns.
-        :param columns: the columns.
-        :return: the modified query.
-        """
-        for col in columns:
-            if col not in self.selected_columns:
-                self.selected_columns.append(col)
-        return self
-
-    def table_exists(self, table: Table) -> bool:
-        """
-        Check if a table exists in the query.
-        :param table: the table.
-        :return: True if the table exists, False otherwise.
-        """
-        return table in self.joins or [col in self.selected_columns for col in table.ID.table.columns]
-
-    def _update_joins_metadata(self, joins: Dict[Table, BinaryExpression],
-                               in_filters: Optional[Dict[Column, List]] = None,
-                               remove_filters: Optional[Dict[Column, List]] = None):
-        """
-        Update the joins' metadata.
-        :param joins: the joins.
-        :param in_filters: the column values to include.
-        :param remove_filters: the column values to remove.
-        """
-        if joins is not None:
-            self.update_joins(joins)
-        if in_filters is not None:
-            self.update_in_filters(in_filters)
-        if remove_filters is not None:
-            self.update_remove_filters(remove_filters)
-
-    def join(self, table: Table, on: BinaryExpression,
-             select_columns: Optional[List] = None) -> 'NeemAlchemy':
+    def join(self, table: Table, on: BinaryExpression) -> 'NeemQuery':
         """
         Join a table.
         :param table: the table.
         :param on: the condition.
-        :param select_columns: the columns to select.
         :return: the modified query.
         """
-        if select_columns is not None:
-            self.selected_columns.extend(select_columns)
         self.joins[table] = on
         return self
 
-    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemAlchemy':
+    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by task type.
         :param task: the task type.
@@ -587,7 +613,7 @@ class NeemAlchemy:
         """
         return self.filter_by_type(TaskType, task, regexp)
 
-    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemAlchemy':
+    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by participant type.
         :param participant: the participant type.
@@ -598,7 +624,7 @@ class NeemAlchemy:
 
     def filter_by_type(self, type_table: Table, type_: str,
                        regexp: Optional[bool] = False,
-                       use_not_: Optional[bool] = False) -> 'NeemAlchemy':
+                       use_not_: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by type.
         :param type_table: the type table.
@@ -616,7 +642,7 @@ class NeemAlchemy:
         self.filters.append(cond)
         return self
 
-    def filter(self, *filters: BinaryExpression) -> 'NeemAlchemy':
+    def filter(self, *filters: BinaryExpression) -> 'NeemQuery':
         """
         Filter the query.
         :param filters: the filters.
@@ -654,7 +680,7 @@ class NeemAlchemy:
             self.query = self.query.filter(*all_filters)
         return self.query
 
-    def select(self, *entities: InstrumentedAttribute) -> 'NeemAlchemy':
+    def select(self, *entities: InstrumentedAttribute) -> 'NeemQuery':
         """
         Select the columns.
         :param entities: the columns.
@@ -663,7 +689,7 @@ class NeemAlchemy:
         self.update_selected_columns(entities)
         return self
 
-    def select_from(self, *tables: Table) -> 'NeemAlchemy':
+    def select_from(self, *tables: Table) -> 'NeemQuery':
         """
         Select the tables.
         :param tables: the tables.
@@ -681,4 +707,8 @@ class NeemAlchemy:
         self.joins = {}
         self.in_filters = {}
         self.remove_filters = {}
-        self.selected_columns = []
+        self.outer_joins = {}
+        self.filters = []
+        self._limit = None
+        self._order_by = None
+        self.select_from_tables = []
