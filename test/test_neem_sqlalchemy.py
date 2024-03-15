@@ -2,15 +2,15 @@ from unittest import TestCase
 
 import pandas as pd
 
-from pycram.neems.neem_loader_sqlalchemy import NeemLoader, TaskType, ParticipantType
+from pycram.neems.neem_sqlalchemy import NeemAlchemy, TaskType, ParticipantType
 from pycram.neems.neems_database import *
 
 
 class TestNeemSqlAlchemy(TestCase):
-    nl: NeemLoader
+    nl: NeemAlchemy
 
     def setUp(self):
-        self.nl = NeemLoader("mysql+pymysql://newuser:password@localhost/test")
+        self.nl = NeemAlchemy("mysql+pymysql://newuser:password@localhost/test")
 
     def tearDown(self):
         self.nl.reset()

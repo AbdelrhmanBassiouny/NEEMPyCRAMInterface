@@ -12,7 +12,10 @@ TaskType = aliased(RdfType)
 ParticipantType = aliased(RdfType)
 
 
-class NeemLoader:
+class NeemAlchemy:
+    """
+    A class to query the neems database using sqlalchemy.
+    """
     engine: Engine
     session: Session
 
@@ -258,7 +261,7 @@ class NeemLoader:
             self.query = self.query.order_by(self._order_by)
         return self._filter(self.in_filters, self.remove_filters, self.filters)
 
-    def join_task_participants(self) -> 'NeemLoader':
+    def join_task_participants(self) -> 'NeemAlchemy':
         """
         Add task participant_types to the query,
         Assumes tasks have been joined/selected already.
@@ -269,7 +272,7 @@ class NeemLoader:
         self._update_joins_metadata(joins, in_filters)
         return self
 
-    def join_participant_types(self) -> 'NeemLoader':
+    def join_participant_types(self) -> 'NeemAlchemy':
         """
         Add participant types to the query,
         Assumes participant_types have been joined/selected already.
@@ -277,7 +280,7 @@ class NeemLoader:
         """
         return self.join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o)
 
-    def join_task_types(self) -> 'NeemLoader':
+    def join_task_types(self) -> 'NeemAlchemy':
         """
         Add task types to the query,
         Assumes tasks have been joined/selected already.
@@ -285,7 +288,7 @@ class NeemLoader:
         """
         return self.join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o)
 
-    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column) -> 'NeemLoader':
+    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column) -> 'NeemAlchemy':
         """
         Join a type table.
         :param type_table: the type table.
@@ -299,7 +302,7 @@ class NeemLoader:
         self._update_joins_metadata(joins, in_filters, remove_filters)
         return self
 
-    def join_participant_base_link(self) -> 'NeemLoader':
+    def join_participant_base_link(self) -> 'NeemAlchemy':
         """
         Add base links of participant_types to the query,
         Assumes participant_types have been joined/selected already.
@@ -310,7 +313,7 @@ class NeemLoader:
         self._update_joins_metadata(joins, in_filters)
         return self
 
-    def join_task_time_interval(self) -> 'NeemLoader':
+    def join_task_time_interval(self) -> 'NeemAlchemy':
         """
         Add time interval of tasks to the query,
         Assumes tasks have been joined/queried already.
@@ -328,7 +331,7 @@ class NeemLoader:
         return self
 
     def join_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                 end_offset: Optional[float] = 0) -> 'NeemLoader':
+                                 end_offset: Optional[float] = 0) -> 'NeemAlchemy':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
@@ -344,7 +347,7 @@ class NeemLoader:
         self.update_in_filters({Tf.neem_id: [SomaHasIntervalBegin.neem_id]})
         return self
 
-    def join_tf_on_tasks(self) -> 'NeemLoader':
+    def join_tf_on_tasks(self) -> 'NeemAlchemy':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes tasks have been joined/selected already.
@@ -355,7 +358,7 @@ class NeemLoader:
         self.joins.update(joins)
         return self
 
-    def join_tf_on_base_link(self) -> 'NeemLoader':
+    def join_tf_on_base_link(self) -> 'NeemAlchemy':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes UrdfHasBaseLink has been joined/selected already.
@@ -366,7 +369,7 @@ class NeemLoader:
         self.update_in_filters({Tf.neem_id: [UrdfHasBaseLink.neem_id]})
         return self
 
-    def join_tf_transfrom(self) -> 'NeemLoader':
+    def join_tf_transfrom(self) -> 'NeemAlchemy':
         """
         Add transform data to the query.
         Assumes tf has been joined/selected already.
@@ -378,14 +381,14 @@ class NeemLoader:
         self.joins.update(joins)
         return self
 
-    def filter_tf_by_base_link(self) -> 'NeemLoader':
+    def filter_tf_by_base_link(self) -> 'NeemAlchemy':
         """
         Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already.
         :return: the modified query.
         """
         return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
 
-    def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemLoader':
+    def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemAlchemy':
         """
         Join the neem table, if on is None, will join on the neem_id column of any table that has it.
         :param on: the condition to join on.
@@ -419,7 +422,7 @@ class NeemLoader:
                     break
         return neem_id
 
-    def join_neems_environment(self) -> 'NeemLoader':
+    def join_neems_environment(self) -> 'NeemAlchemy':
         """
         Join the neems environment index table. Assumes neem has been joined/selected already.
         :return: the modified query.
@@ -428,7 +431,7 @@ class NeemLoader:
         self.update_joins(joins)
         return self
 
-    def limit(self, limit: int) -> 'NeemLoader':
+    def limit(self, limit: int) -> 'NeemAlchemy':
         """
         Limit the query results.
         :param limit: the limit.
@@ -437,7 +440,7 @@ class NeemLoader:
         self._limit = limit
         return self
 
-    def order_by(self, column: Column) -> 'NeemLoader':
+    def order_by(self, column: Column) -> 'NeemAlchemy':
         """
         Order the query results. (It's recommended to use this after having the dataframe in pandas to
          avoid long query times)
@@ -488,7 +491,7 @@ class NeemLoader:
             else:
                 filters[col] = values
 
-    def select_tf_columns(self) -> 'NeemLoader':
+    def select_tf_columns(self) -> 'NeemAlchemy':
         """
         Select tf data (transform, header, child_frame_id) to the query,
         """
@@ -497,7 +500,7 @@ class NeemLoader:
                                       TfHeader.stamp.label("stamp")])
         return self
 
-    def select_tf_transform_columns(self) -> 'NeemLoader':
+    def select_tf_transform_columns(self) -> 'NeemAlchemy':
         """
         Select tf transform data (translation, rotation) to the query,
         """
@@ -510,7 +513,7 @@ class NeemLoader:
                                       TransformRotation.w.label("w")])
         return self
 
-    def update_select_from_tables(self, tables: List[Table]) -> 'NeemLoader':
+    def update_select_from_tables(self, tables: List[Table]) -> 'NeemAlchemy':
         """
         Update the selected tables.
         :param tables: the tables.
@@ -521,7 +524,7 @@ class NeemLoader:
                 self.select_from_tables.append(table)
         return self
 
-    def update_selected_columns(self, columns: List[InstrumentedAttribute]) -> 'NeemLoader':
+    def update_selected_columns(self, columns: List[InstrumentedAttribute]) -> 'NeemAlchemy':
         """
         Update the selected columns.
         :param columns: the columns.
@@ -557,7 +560,7 @@ class NeemLoader:
             self.update_remove_filters(remove_filters)
 
     def join(self, table: Table, on: BinaryExpression,
-             select_columns: Optional[List] = None) -> 'NeemLoader':
+             select_columns: Optional[List] = None) -> 'NeemAlchemy':
         """
         Join a table.
         :param table: the table.
@@ -570,7 +573,7 @@ class NeemLoader:
         self.joins[table] = on
         return self
 
-    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemLoader':
+    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemAlchemy':
         """
         Filter the query by task type.
         :param task: the task type.
@@ -579,7 +582,7 @@ class NeemLoader:
         """
         return self.filter_by_type(TaskType, task, regexp)
 
-    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemLoader':
+    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemAlchemy':
         """
         Filter the query by participant type.
         :param participant: the participant type.
@@ -590,7 +593,7 @@ class NeemLoader:
 
     def filter_by_type(self, type_table: Table, type_: str,
                        regexp: Optional[bool] = False,
-                       use_not_: Optional[bool] = False) -> 'NeemLoader':
+                       use_not_: Optional[bool] = False) -> 'NeemAlchemy':
         """
         Filter the query by type.
         :param type_table: the type table.
@@ -608,7 +611,7 @@ class NeemLoader:
         self.filters.append(cond)
         return self
 
-    def filter(self, *filters: BinaryExpression) -> 'NeemLoader':
+    def filter(self, *filters: BinaryExpression) -> 'NeemAlchemy':
         """
         Filter the query.
         :param filters: the filters.
@@ -646,7 +649,7 @@ class NeemLoader:
             self.query = self.query.filter(*all_filters)
         return self.query
 
-    def select(self, *entities: InstrumentedAttribute) -> 'NeemLoader':
+    def select(self, *entities: InstrumentedAttribute) -> 'NeemAlchemy':
         """
         Select the columns.
         :param entities: the columns.
@@ -655,7 +658,7 @@ class NeemLoader:
         self.selected_columns.extend(entities)
         return self
 
-    def select_from(self, *tables: Table) -> 'NeemLoader':
+    def select_from(self, *tables: Table) -> 'NeemAlchemy':
         """
         Select the tables.
         :param tables: the tables.

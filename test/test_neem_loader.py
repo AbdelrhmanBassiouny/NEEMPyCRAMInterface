@@ -1,5 +1,5 @@
 from unittest import TestCase
-from pycram.neems import neem_loader as nl
+from pycram.neems import neem_interface as nl
 from sqlalchemy import create_engine, Engine
 import pandas as pd
 
