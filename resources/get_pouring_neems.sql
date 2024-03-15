@@ -57,7 +57,7 @@ WHERE task_type.s = task.dul_Task_o
   and trot.ID = tft.rotation
   and ttrans.ID = tft.translation
 
-  # Just ensuring no mixing between neems
+  # Just ensuring no mixing between sql_neems
   and task_type.neem_id = task.neem_id
   and n._id = task.neem_id
   and has_participant.neem_id = n._id

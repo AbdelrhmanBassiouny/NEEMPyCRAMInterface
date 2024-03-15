@@ -3,7 +3,9 @@ import rospy
 from sqlalchemy import Engine, text
 from typing_extensions import List, Iterable, Tuple, Optional
 
-from pycram.datastructures.pose import Pose, Transform
+from ..datastructures.pose import Pose, Transform
+from ..sql_neems.neem_alchemy import NeemAlchemy as na, TaskType, ParticipantType
+from ..sql_neems.neems_database import *
 
 
 def get_dataframe_from_sql_query_file(sql_filename: str, engine: Engine) -> pd.DataFrame:
@@ -36,6 +38,33 @@ def get_dataframe_from_sql_query(sql_query: str, engine: Engine) -> pd.DataFrame
     with engine.connect() as conn:
         df = pd.read_sql(text(sql_query), conn)
     return df
+
+
+def get_task_data(task: str) -> pd.DataFrame:
+    """
+    Get all data related to a certain task.
+    :param task: The required task.
+    :return: the data in a pandas dataframe.
+    """
+    df = (na.select(TfHeader.stamp,
+                    ParticipantType.o.label("particpant")).
+          select_tf_columns().
+          select_tf_transform_columns().
+          select_from(DulExecutesTask).
+          join_task_types().
+          join_task_participants().
+          join_participant_types().
+          join_participant_base_link().
+          join_task_time_interval().
+          join_tf_on_time_interval().
+          join_tf_transfrom().join_neems().join_neems_environment().
+          filter_tf_by_base_link().
+          filter_by_task_type(task, regexp=True)).get_result()
+    df.sort_values(by=['stamp'], inplace=True)
+    return df
+
+
+
 
 
 def filter_by_neem_id(all_neems_df: pd.DataFrame, neem_id: str) -> pd.DataFrame:

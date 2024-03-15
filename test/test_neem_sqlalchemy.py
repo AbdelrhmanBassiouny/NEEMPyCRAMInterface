@@ -2,8 +2,8 @@ from unittest import TestCase
 
 import pandas as pd
 
-from pycram.neems.neem_sqlalchemy import NeemAlchemy, TaskType, ParticipantType
-from pycram.neems.neems_database import *
+from pycram.sql_neems.neem_alchemy import NeemAlchemy, TaskType, ParticipantType
+from pycram.sql_neems.neems_database import *
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -46,6 +46,8 @@ class TestNeemSqlAlchemy(TestCase):
     def test_multi_join(self):
         df = (self.nl.select(TfHeader.stamp,
                              ParticipantType.o.label("particpant")).
+              select_tf_columns().
+              select_tf_transform_columns().
               select_from(DulExecutesTask).
               join_task_types().
               join_task_participants().
@@ -55,11 +57,9 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_on_time_interval().
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
-              filter_by_task_type("Pour", regexp=True)).get_result()
-        df.sort_values(by=['stamp'], inplace=True)
+              filter_by_task_type("Pour", regexp=True).order_by(TfHeader.stamp)).get_result()
         pd.set_option('display.float_format', lambda x: '%.3f' % x)
         pd.set_option('display.max_columns', None)
-        print(df)
         self.assertIsNotNone(df)
 
     def test_get_neem(self):

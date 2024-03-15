@@ -420,11 +420,16 @@ class NeemAlchemy:
                 if self.has_neem_id(col.table):
                     neem_id = col.table.columns.neem_id
                     break
+        if neem_id is None:
+            for table in self.select_from_tables:
+                if self.has_neem_id(table.ID.table):
+                    neem_id = table.neem_id
+                    break
         return neem_id
 
     def join_neems_environment(self) -> 'NeemAlchemy':
         """
-        Join the neems environment index table. Assumes neem has been joined/selected already.
+        Join the neems_environment_index table. Assumes neem has been joined/selected already.
         :return: the modified query.
         """
         joins = {NeemsEnvironmentIndex: NeemsEnvironmentIndex.neems_ID == Neem.ID}
@@ -655,7 +660,7 @@ class NeemAlchemy:
         :param entities: the columns.
         :return: the modified query.
         """
-        self.selected_columns.extend(entities)
+        self.update_selected_columns(entities)
         return self
 
     def select_from(self, *tables: Table) -> 'NeemAlchemy':
