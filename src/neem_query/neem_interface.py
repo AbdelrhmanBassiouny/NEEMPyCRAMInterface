@@ -3,9 +3,9 @@ import rospy
 from sqlalchemy import Engine, text
 from typing_extensions import List, Tuple, Optional
 
-from ..datastructures.pose import Pose, Transform
-from ..sql_neems.neem_query import NeemQuery, TaskType, ParticipantType
-from ..sql_neems.neems_database import *
+from pycram.datastructures.pose import Pose, Transform
+from .neem_query import NeemQuery, TaskType, ParticipantType
+from .neems_database import *
 
 na = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
 

@@ -1,5 +1,5 @@
 from unittest import TestCase
-from pycram.sql_neems import neem_interface as nl
+from neem_query import neem_interface as nl
 from sqlalchemy import create_engine, Engine
 import pandas as pd
 
@@ -38,12 +38,10 @@ class TestNeemLoader(TestCase):
 
     def test_get_task_sequence_of_neem(self):
         df = nl.get_task_sequence_of_neem(2).get_result()
-        print(df)
         self.assertIsInstance(df, pd.DataFrame)
 
     def test_get_plan_of_neem(self):
         df = nl.get_plan_of_neem(2).get_result()
-        print(df)
         self.assertIsInstance(df, pd.DataFrame)
 
 

@@ -2,8 +2,8 @@ from unittest import TestCase
 
 import pandas as pd
 
-from pycram.sql_neems.neem_query import NeemQuery, TaskType, ParticipantType
-from pycram.sql_neems.neems_database import *
+from neem_query import NeemQuery, TaskType, ParticipantType
+from neem_query.neems_database import *
 
 
 class TestNeemSqlAlchemy(TestCase):
