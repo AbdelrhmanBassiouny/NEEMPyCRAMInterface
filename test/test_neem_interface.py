@@ -1,9 +1,16 @@
-from unittest import TestCase
-from neem_query import neem_interface as ni
+from unittest import TestCase, skipIf
+
 from sqlalchemy import create_engine, Engine
 import pandas as pd
 
+missing_library = False
+try:
+    from neem_query import neem_interface as ni
+except ImportError:
+    missing_library = True
 
+
+@skipIf(missing_library, "Probably pycram is not installed. Skip tests.")
 class TestNeemLoader(TestCase):
     engine: Engine
     all_neems_df: pd.DataFrame
