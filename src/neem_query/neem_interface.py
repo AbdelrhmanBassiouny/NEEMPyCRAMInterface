@@ -7,7 +7,7 @@ from pycram.datastructures.pose import Pose, Transform
 from .neem_query import NeemQuery, TaskType, ParticipantType
 from .neems_database import *
 
-na = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
+nq = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
 
 
 def get_dataframe_from_sql_query_file(sql_filename: str, engine: Engine) -> pd.DataFrame:
@@ -48,7 +48,7 @@ def get_task_data(task: str) -> pd.DataFrame:
     :param task: The required task.
     :return: the data in a pandas dataframe.
     """
-    df = (na.select(TfHeader.stamp,
+    df = (nq.select(TfHeader.stamp,
                     ParticipantType.o.label("particpant")).
           select_tf_columns().
           select_tf_transform_columns().
@@ -71,7 +71,7 @@ def get_task_sequence_of_neem(neem_id: int) -> NeemQuery:
     :param neem_id: The id in (ID) column of the Neems table.
     :return: The task tree as a pandas dataframe.
     """
-    na_query = (na.select(TaskType.o.label('task')).select_time_columns().select_from(DulExecutesTask).
+    na_query = (nq.select(TaskType.o.label('task')).select_time_columns().select_from(DulExecutesTask).
                 join_task_types().
                 join_neems().
                 filter(Neem.ID == neem_id).
