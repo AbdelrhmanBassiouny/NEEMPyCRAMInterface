@@ -30,25 +30,25 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_join_task_participants(self):
         df = (self.nq.select_from_tasks().
-              join_task_participants()).get_result()
+              join_task_participants()).get_result().df
         self.assertIsNotNone(df)
 
     def test_join_task_participant_types(self):
         df = (self.nq.select_from(DulHasParticipant).
-              join_participant_types()).get_result()
+              join_participant_types()).get_result().df
         self.assertIsNotNone(df)
 
     def test_join_task_types(self):
         df = (self.nq.select_task().
-              join_task_types()).get_result()
+              join_task_types()).get_result().df
         self.assertIsNotNone(df)
 
     def test_outer_join(self):
         outer_df = (self.nq.select_task().
-                    join_task_participants(is_outer=True)).get_result()
+                    join_task_participants(is_outer=True)).get_result().df
         self.nq.reset()
         df = (self.nq.select_task().
-              join_task_participants(is_outer=False)).get_result()
+              join_task_participants(is_outer=False)).get_result().df
         self.assertIsNotNone(len(df) < len(outer_df))
 
     def test_multi_join(self):
@@ -64,7 +64,7 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_on_time_interval().
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
-              filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result()
+              filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result().df
         pd.set_option('display.float_format', lambda x: '%.3f' % x)
         pd.set_option('display.max_columns', None)
         self.assertIsNotNone(df)

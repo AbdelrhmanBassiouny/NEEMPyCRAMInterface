@@ -8,6 +8,7 @@ from typing_extensions import Optional, List, Dict
 
 from .neems_database import *
 from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask
+from .query_result import QueryResult
 
 
 class NeemQuery:
@@ -30,6 +31,7 @@ class NeemQuery:
         self._limit: Optional[int] = None
         self._order_by: Optional[Column] = None
         self.select_from_tables: Optional[List[Table]] = []
+        self.latest_query: Optional[Select] = None
 
     def get_task(self, task: str) -> DulExecutesTask:
         """
@@ -225,13 +227,11 @@ class NeemQuery:
         df = pd.read_sql(query.statement, self.engine)
         return df
 
-    def get_result(self) -> pd.DataFrame:
+    def get_result(self) -> QueryResult:
         """
-        Get the data of the query as a dataframe.
-        :param chunk_size: the size of the chunks, if None, will get the whole data at once.
-        :return: the dataframe.
+        Get the data of the query as a QueryResult object using the pandas dataframe.
         """
-        return pd.read_sql_query(self.statement, self.engine)
+        return QueryResult(pd.read_sql_query(self.statement, self.engine))
 
     def get_result_in_chunks(self, chunk_size: Optional[int] = 500):
         """
@@ -260,7 +260,9 @@ class NeemQuery:
             self.query = self.query.limit(self._limit)
         if self._order_by is not None:
             self.query = self.query.order_by(self._order_by)
-        return self._filter(self.in_filters, self.remove_filters, self.filters)
+        self._filter(self.in_filters, self.remove_filters, self.filters)
+        self.latest_query = self.query
+        return self.query
 
     def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -635,7 +637,7 @@ class NeemQuery:
         Select from the DulExecutesTask table.
         :return: the modified query.
         """
-        return self.select_from(DulExecutesTask)
+        return self.update_select_from_tables([DulExecutesTask])
 
     def order_by_stamp(self) -> 'NeemQuery':
         """
@@ -752,7 +754,7 @@ class NeemQuery:
         :param on: the condition.
         :return: the modified query.
         """
-        self.joins[table] = on
+        self.update_joins({table: on})
         return self
 
     def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemQuery':
@@ -863,3 +865,13 @@ class NeemQuery:
         self._limit = None
         self._order_by = None
         self.select_from_tables = []
+        self.latest_query = None
+
+    def __eq__(self, other):
+        return self.statement == other.statement
+
+    @property
+    def query_changed(self):
+        if self.latest_query is None:
+            return False
+        return self.query == self.latest_query
