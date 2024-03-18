@@ -1,19 +1,20 @@
-from unittest import TestCase, skipIf
+from unittest import TestCase
 
-from sqlalchemy import create_engine, Engine
 import pandas as pd
 from neem_query.neem_interface import NeemInterface
+from neem_query.neems_database import *
+from neem_query.enums import TaskType, ParticipantType, SubTask, SubTaskType
 
 
-class TestNeemLoader(TestCase):
-    engine: Engine
+class TestNeemInterface(TestCase):
+    ni: NeemInterface
     all_neems_df: pd.DataFrame
 
     @classmethod
     def setUpClass(cls):
         # Connection to MariaDB NEEM database.
         cls.ni = NeemInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.all_neems_df = cls.ni.get_task_sequence().get_result()
+        cls.all_neems_df = cls.ni.get_all_plans().select_participant().get_result()
 
     def test_get_neem_ids(self):
         neem_ids = self.ni.get_neem_ids(self.all_neems_df)

@@ -3,13 +3,11 @@ import logging
 import pandas as pd
 from sqlalchemy import (create_engine, Engine, between, and_, func, Table, BinaryExpression, select,
                         Select, not_)
-from sqlalchemy.orm import sessionmaker, aliased, InstrumentedAttribute, Session
+from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
 from .neems_database import *
-
-TaskType = aliased(RdfType)
-ParticipantType = aliased(RdfType)
+from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask
 
 
 class NeemQuery:
@@ -39,6 +37,7 @@ class NeemQuery:
         :param task: the task name.
         :return: the task.
         """
+        # noinspection PyTypeChecker
         return self.session.query(DulExecutesTask).filter(DulExecutesTask.dul_Task_o == task).first()
 
     @staticmethod
@@ -48,6 +47,7 @@ class NeemQuery:
         :param table: the table.
         :return: the column names.
         """
+        # noinspection PyTypeChecker
         return [col.name for col in table.columns]
 
     def neem_cond(self, col1: InstrumentedAttribute, col2: InstrumentedAttribute, default_neem_id=None):
@@ -262,6 +262,34 @@ class NeemQuery:
             self.query = self.query.order_by(self._order_by)
         return self._filter(self.in_filters, self.remove_filters, self.filters)
 
+    def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the subtasks table. Assumes DulExecutesTask has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {DulHasConstituent:
+                     and_(DulHasConstituent.dul_Entity_s == DulExecutesTask.dul_Action_s,
+                          DulHasConstituent.neem_id == DulExecutesTask.neem_id),
+                 SubTask:
+                     and_(SubTask.dul_Action_s == DulHasConstituent.dul_Entity_o,
+                          SubTask.neem_id == DulExecutesTask.neem_id)}
+        outer_join = {DulHasConstituent: is_outer, SubTask: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        self.join_type(SubTaskType, SubTask, SubTask.dul_Task_o, is_outer=is_outer)
+        return self
+
+    def join_all_task_participants_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the participants' data.
+        :param is_outer: whether to use outer join or not.
+        :return: the NEEMs as a pandas dataframe.
+        """
+        (self.join_task_participants(is_outer=is_outer).
+         join_participant_types(is_outer=is_outer).
+         join_participant_base_link(is_outer=is_outer))
+        return self
+
     def join_task_participants(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add task participant_types to the query,
@@ -448,6 +476,30 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
+    def join_task_parameter(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the task parameter table. Assumes DulExecutesTask has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {DulHasParameter: and_(DulHasParameter.dul_Concept_s == DulExecutesTask.dul_Task_o,
+                                       DulHasParameter.neem_id == DulExecutesTask.neem_id)}
+        outer_join = {DulHasParameter: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_parameter_classification(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the task parameter classification table. Assumes DulHasParameter has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {DulClassify: and_(DulClassify.dul_Concept_s == DulHasParameter.dul_Parameter_o,
+                                   DulClassify.neem_id == DulHasParameter.neem_id)}
+        outer_join = {DulClassify: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
     def limit(self, limit: int) -> 'NeemQuery':
         """
         Limit the query results.
@@ -470,69 +522,127 @@ class NeemQuery:
     def select_tf_columns(self) -> 'NeemQuery':
         """
         Select tf data (transform, header, child_frame_id) to the query,
+        :return: the modified query.
         """
-        self.update_selected_columns([Tf.child_frame_id.label("child_frame_id"),
-                                      TfHeader.frame_id.label("frame_id"),
-                                      TfHeader.stamp.label("stamp")])
+        self.update_selected_columns([Tf.child_frame_id,
+                                      TfHeader.frame_id,
+                                      TfHeader.stamp])
         return self
 
-    def select_tf_transform_columns(self, position_prefix: Optional[str] = 't',
-                                    orientation_prefix: Optional[str] = 'q') -> 'NeemQuery':
+    def select_tf_transform_columns(self) -> 'NeemQuery':
         """
-        Select tf transform data (translation, rotation) to the query,
+        Select tf transform data (translation, rotation).
+        :return: the modified query.
         """
-        self.update_selected_columns([TransformTranslation.x.label(f"{position_prefix}x"),
-                                      TransformTranslation.y.label(f"{position_prefix}y"),
-                                      TransformTranslation.z.label(f"{position_prefix}z"),
-                                      TransformRotation.x.label(f"{orientation_prefix}x"),
-                                      TransformRotation.y.label(f"{orientation_prefix}y"),
-                                      TransformRotation.z.label(f"{orientation_prefix}z"),
-                                      TransformRotation.w.label(f"{orientation_prefix}w")])
+        self.update_selected_columns([TransformTranslation.x,
+                                      TransformTranslation.y,
+                                      TransformTranslation.z,
+                                      TransformRotation.x,
+                                      TransformRotation.y,
+                                      TransformRotation.z,
+                                      TransformRotation.w])
         return self
 
-    def select_time_columns(self, begin_label: Optional[str] = "begin",
-                            end_label: Optional[str] = "end") -> 'NeemQuery':
+    def select_time_columns(self) -> 'NeemQuery':
         """
-        Select time columns to the query,
+        Select time begin and end columns of tasks.
+        :return: the modified query.
         """
-        self.update_selected_columns([SomaHasIntervalBegin.o.label(begin_label),
-                                      SomaHasIntervalEnd.o.label(end_label)])
+        self.update_selected_columns([SomaHasIntervalBegin.o, SomaHasIntervalEnd.o])
         return self
 
-    def select_participant(self, label: Optional[str] = "participant") -> 'NeemQuery':
+    def select_participant(self) -> 'NeemQuery':
         """
-        Select participant to the query,
+        Select participant instances column.
+        :return: the modified query.
         """
-        self.update_selected_columns([DulHasParticipant.dul_Object_o.label(label)])
+        self.update_selected_columns([DulHasParticipant.dul_Object_o])
         return self
 
-    def select_task(self, label: Optional[str] = "task") -> 'NeemQuery':
+    def select_task(self) -> 'NeemQuery':
         """
-        Select task to the query,
+        Select task instances column.
+        :return: the modified query.
         """
-        self.update_selected_columns([DulExecutesTask.dul_Task_o.label(label)])
+        self.update_selected_columns([DulExecutesTask.dul_Task_o])
         return self
 
-    def select_task_type(self, label: Optional[str] = "task_type") -> 'NeemQuery':
+    def select_task_type(self) -> 'NeemQuery':
         """
-        Select task type to the query,
+        Select task type column.
+        :return: the modified query.
         """
-        self.update_selected_columns([TaskType.o.label(label)])
+        self.select_type(TaskType)
         return self
 
-    def select_participant_type(self, label: Optional[str] = "participant_type") -> 'NeemQuery':
+    def select_participant_type(self) -> 'NeemQuery':
         """
-        Select participant type to the query,
+        Select participant type column.
+        :return: the modified query.
         """
-        self.update_selected_columns([ParticipantType.o.label(label)])
+        self.select_type(ParticipantType)
         return self
 
-    def select_subtask(self, label: Optional[str] = "subtask") -> 'NeemQuery':
+    def select_subtask(self) -> 'NeemQuery':
         """
-        Select subtask to the query,
+        Select subtask instances column.
+        :return: the modified query.
         """
-        self.update_selected_columns([DulExecutesTask.dul_Action_s.label(label)])
+        self.update_selected_columns([SubTask.dul_Task_o])
         return self
+
+    def select_subtask_type(self) -> 'NeemQuery':
+        """
+        Select subtask type column.
+        :return: the modified query.
+        """
+        self.select_type(SubTaskType)
+        return self
+
+    def select_type(self, type_table: Table) -> 'NeemQuery':
+        """
+        Select a type to the query,
+        """
+        self.update_selected_columns([type_table.o])
+        return self
+
+    def select_parameter_type(self) -> 'NeemQuery':
+        """
+        Select task parameter type column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([DulHasParameter.dul_Parameter_o])
+        return self
+
+    def select_parameter(self) -> 'NeemQuery':
+        """
+        Select task parameter column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([DulClassify.dul_Entity_o])
+        return self
+
+    def select_stamp(self) -> 'NeemQuery':
+        """
+        Select the tf header stamp column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([TfHeader.stamp])
+        return self
+
+    def select_from_tasks(self) -> 'NeemQuery':
+        """
+        Select from the DulExecutesTask table.
+        :return: the modified query.
+        """
+        return self.select_from(DulExecutesTask)
+
+    def order_by_stamp(self) -> 'NeemQuery':
+        """
+        Order the query results by the tf header stamp column.
+        :return: the modified query.
+        """
+        return self.order_by(TfHeader.stamp)
 
     def update_select_from_tables(self, tables: List[Table]) -> 'NeemQuery':
         """
@@ -553,7 +663,11 @@ class NeemQuery:
         """
         for col in columns:
             if col not in self.selected_columns:
-                self.selected_columns.append(col)
+                if col in column_to_label:
+                    self.selected_columns.append(col.label(column_to_label[col]))
+                else:
+                    logging.warning(f"Column {col} not found in the column to label dictionary")
+                    self.selected_columns.append(col)
         return self
 
     def table_exists(self, table: Table) -> bool:

@@ -29,7 +29,7 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(task_data)
 
     def test_join_task_participants(self):
-        df = (self.nq.select_from(DulExecutesTask).
+        df = (self.nq.select_from_tasks().
               join_task_participants()).get_result()
         self.assertIsNotNone(df)
 
@@ -39,24 +39,23 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(df)
 
     def test_join_task_types(self):
-        df = (self.nq.select(DulExecutesTask.dul_Task_o).
+        df = (self.nq.select_task().
               join_task_types()).get_result()
         self.assertIsNotNone(df)
 
     def test_outer_join(self):
-        outer_df = (self.nq.select(DulExecutesTask.dul_Task_o).
-              join_task_participants(is_outer=True)).get_result()
+        outer_df = (self.nq.select_task().
+                    join_task_participants(is_outer=True)).get_result()
         self.nq.reset()
-        df = (self.nq.select(DulExecutesTask.dul_Task_o).
+        df = (self.nq.select_task().
               join_task_participants(is_outer=False)).get_result()
         self.assertIsNotNone(len(df) < len(outer_df))
 
     def test_multi_join(self):
-        df = (self.nq.select(TfHeader.stamp,
-                             ParticipantType.o.label("particpant")).
+        df = (self.nq.select_stamp().select_participant_type().
               select_tf_columns().
               select_tf_transform_columns().
-              select_from(DulExecutesTask).
+              select_from_tasks().
               join_task_types().
               join_task_participants().
               join_participant_types().
@@ -65,7 +64,7 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_on_time_interval().
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
-              filter_by_task_type("Pour", regexp=True).order_by(TfHeader.stamp)).get_result()
+              filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result()
         pd.set_option('display.float_format', lambda x: '%.3f' % x)
         pd.set_option('display.max_columns', None)
         self.assertIsNotNone(df)
