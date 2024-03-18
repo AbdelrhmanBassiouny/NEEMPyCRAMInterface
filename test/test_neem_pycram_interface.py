@@ -1,17 +1,25 @@
-from unittest import TestCase
-from neem_query.neem_pycram_interface import PyCRAMNeemInterface
+from unittest import TestCase, skipIf
+from neem_query.neem_pycram_interface import PyCRAMNEEMInterface
 import pandas as pd
-from pycram.datastructures.pose import Pose, Transform
+
+from neem_query.query_result import QueryResult
+
+pycram_not_found = False
+try:
+    from pycram.datastructures.pose import Pose, Transform
+except ImportError:
+    pycram_not_found = True
 
 
+@skipIf(pycram_not_found, "PyCRAM not found.")
 class TestNeemPycramInterface(TestCase):
-    neem_df: pd.DataFrame
-    pni: PyCRAMNeemInterface
+    neem_qr: QueryResult
+    pni: PyCRAMNEEMInterface
 
     @classmethod
     def setUpClass(cls):
-        cls.pni = PyCRAMNeemInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.neem_df = (cls.pni.get_neems_containing_task('Pour', regexp=True).
+        cls.pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
+        cls.neem_qr = (cls.pni.get_task_data_from_all_neems('Pour', regexp=True).
                        limit(100).get_result())
 
     def test_get_poses(self):
