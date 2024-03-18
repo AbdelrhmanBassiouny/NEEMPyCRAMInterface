@@ -476,25 +476,62 @@ class NeemQuery:
                                       TfHeader.stamp.label("stamp")])
         return self
 
-    def select_tf_transform_columns(self) -> 'NeemQuery':
+    def select_tf_transform_columns(self, position_prefix: Optional[str] = 't',
+                                    orientation_prefix: Optional[str] = 'q') -> 'NeemQuery':
         """
         Select tf transform data (translation, rotation) to the query,
         """
-        self.update_selected_columns([TransformTranslation.x.label("tx"),
-                                      TransformTranslation.y.label("ty"),
-                                      TransformTranslation.z.label("tz"),
-                                      TransformRotation.x.label("qx"),
-                                      TransformRotation.y.label("qy"),
-                                      TransformRotation.z.label("qz"),
-                                      TransformRotation.w.label("qw")])
+        self.update_selected_columns([TransformTranslation.x.label(f"{position_prefix}x"),
+                                      TransformTranslation.y.label(f"{position_prefix}y"),
+                                      TransformTranslation.z.label(f"{position_prefix}z"),
+                                      TransformRotation.x.label(f"{orientation_prefix}x"),
+                                      TransformRotation.y.label(f"{orientation_prefix}y"),
+                                      TransformRotation.z.label(f"{orientation_prefix}z"),
+                                      TransformRotation.w.label(f"{orientation_prefix}w")])
         return self
 
-    def select_time_columns(self) -> 'NeemQuery':
+    def select_time_columns(self, begin_label: Optional[str] = "begin",
+                            end_label: Optional[str] = "end") -> 'NeemQuery':
         """
         Select time columns to the query,
         """
-        self.update_selected_columns([SomaHasIntervalBegin.o.label("begin"),
-                                      SomaHasIntervalEnd.o.label("end")])
+        self.update_selected_columns([SomaHasIntervalBegin.o.label(begin_label),
+                                      SomaHasIntervalEnd.o.label(end_label)])
+        return self
+
+    def select_participant(self, label: Optional[str] = "participant") -> 'NeemQuery':
+        """
+        Select participant to the query,
+        """
+        self.update_selected_columns([DulHasParticipant.dul_Object_o.label(label)])
+        return self
+
+    def select_task(self, label: Optional[str] = "task") -> 'NeemQuery':
+        """
+        Select task to the query,
+        """
+        self.update_selected_columns([DulExecutesTask.dul_Task_o.label(label)])
+        return self
+
+    def select_task_type(self, label: Optional[str] = "task_type") -> 'NeemQuery':
+        """
+        Select task type to the query,
+        """
+        self.update_selected_columns([TaskType.o.label(label)])
+        return self
+
+    def select_participant_type(self, label: Optional[str] = "participant_type") -> 'NeemQuery':
+        """
+        Select participant type to the query,
+        """
+        self.update_selected_columns([ParticipantType.o.label(label)])
+        return self
+
+    def select_subtask(self, label: Optional[str] = "subtask") -> 'NeemQuery':
+        """
+        Select subtask to the query,
+        """
+        self.update_selected_columns([DulExecutesTask.dul_Action_s.label(label)])
         return self
 
     def update_select_from_tables(self, tables: List[Table]) -> 'NeemQuery':
