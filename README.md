@@ -55,8 +55,9 @@ This is done by using the NeemQuery class directly and explicitly writing the SQ
 and column names and table names.
 
 ```Python
-from neem_query import NeemQuery, TaskType, ParticipantType
-from neem_query.neems_database import *
+from neem_query import NeemQuery, TaskType
+from neem_query.neems_database import SomaHasIntervalBegin, SomaHasIntervalEnd, DulExecutesTask,\
+    DulHasTimeInterval, Neem
 from sqlalchemy import and_
 
 nq = NeemQuery("mysql+pymysql://newuser:password@localhost/test")
