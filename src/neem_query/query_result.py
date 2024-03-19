@@ -115,7 +115,7 @@ class QueryResult:
         else:
             return self.df[CL.participant.value].tolist()
 
-    def get_environment(self) -> List[str]:
+    def get_environments(self) -> List[str]:
         """
         Get the environments in the query result DataFrame.
         :return: the environment in the NEEM.

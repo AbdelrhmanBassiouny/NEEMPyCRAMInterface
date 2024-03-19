@@ -6,8 +6,8 @@ from sqlalchemy import (create_engine, Engine, between, and_, func, Table, Binar
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
-from .neems_database import *
 from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask
+from .neems_database import *
 from .query_result import QueryResult
 
 
@@ -31,7 +31,8 @@ class NeemQuery:
         self._limit: Optional[int] = None
         self._order_by: Optional[Column] = None
         self.select_from_tables: Optional[List[Table]] = []
-        self.latest_query: Optional[Select] = None
+        self.latest_executed_query: Optional[Select] = None
+        self.latest_result: Optional[QueryResult] = None
 
     def get_task(self, task: str) -> DulExecutesTask:
         """
@@ -231,7 +232,10 @@ class NeemQuery:
         """
         Get the data of the query as a QueryResult object using the pandas dataframe.
         """
-        return QueryResult(pd.read_sql_query(self.statement, self.engine))
+        if self.query_changed:
+            self.latest_result = QueryResult(pd.read_sql_query(self.statement, self.engine))
+            self.latest_executed_query = self.query
+        return self.latest_result
 
     def get_result_in_chunks(self, chunk_size: Optional[int] = 500):
         """
@@ -247,21 +251,29 @@ class NeemQuery:
         Get the query statement.
         :return: the query statement.
         """
+        self.construct_query()
+        return self.query
+
+    def construct_query(self) -> Select:
+        """
+        Get the query.
+        :return: the query.
+        """
+        query = None
         if len(self.selected_columns) > 0:
-            self.query = select(*self.selected_columns)
+            query = select(*self.selected_columns)
         if len(self.select_from_tables) > 0:
-            if self.query is None:
-                self.query = select(*self.select_from_tables)
+            if query is None:
+                query = select(*self.select_from_tables)
             else:
-                self.query = self.query.select_from(*self.select_from_tables)
+                query = query.select_from(*self.select_from_tables)
         for table, on in self.joins.items():
-            self.query = self.query.join(table, on, isouter=self.outer_joins.get(table, False))
+            query = query.join(table, on, isouter=self.outer_joins.get(table, False))
         if self._limit is not None:
-            self.query = self.query.limit(self._limit)
+            query = query.limit(self._limit)
         if self._order_by is not None:
-            self.query = self.query.order_by(self._order_by)
-        self._filter(self.in_filters, self.remove_filters, self.filters)
-        self.latest_query = self.query
+            query = query.order_by(self._order_by)
+        self.query = self._filter(query, self.in_filters, self.remove_filters, self.filters)
         return self.query
 
     def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -639,6 +651,14 @@ class NeemQuery:
         """
         return self.update_select_from_tables([DulExecutesTask])
 
+    def select_environment(self) -> 'NeemQuery':
+        """
+        Select the environment values column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([NeemsEnvironmentIndex.environment_values])
+        return self
+
     def order_by_stamp(self) -> 'NeemQuery':
         """
         Order the query results by the tf header stamp column.
@@ -804,11 +824,13 @@ class NeemQuery:
         self.filters.extend(filters)
         return self
 
-    def _filter(self, in_: Optional[Dict[Column, List]] = None,
+    @staticmethod
+    def _filter(query: Select, in_: Optional[Dict[Column, List]] = None,
                 remove: Optional[Dict[Column, List]] = None,
                 filters: Optional[List[BinaryExpression]] = None) -> Select:
         """
         Filter the query.
+        :param query: the query.
         :param in_: the column values to include.
         :param remove: the column values to remove.
         :param filters: the filters to apply.
@@ -830,8 +852,11 @@ class NeemQuery:
         if filters is not None:
             all_filters.extend(filters)
         if len(all_filters) > 0:
-            self.query = self.query.filter(*all_filters)
-        return self.query
+            if query is None:
+                query = Select.filter(*all_filters)
+            else:
+                query = query.filter(*all_filters)
+        return query
 
     def select(self, *entities: InstrumentedAttribute) -> 'NeemQuery':
         """
@@ -865,13 +890,14 @@ class NeemQuery:
         self._limit = None
         self._order_by = None
         self.select_from_tables = []
-        self.latest_query = None
+        self.latest_executed_query = None
+        self.latest_result = None
 
     def __eq__(self, other):
-        return self.statement == other.statement
+        return self.construct_query() == other.construct_query()
 
     @property
     def query_changed(self):
-        if self.latest_query is None:
-            return False
-        return self.query == self.latest_query
+        if self.latest_executed_query is None:
+            return True
+        return str(self.construct_query()) != str(self.latest_executed_query)

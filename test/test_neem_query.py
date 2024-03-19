@@ -76,3 +76,11 @@ class TestNeemSqlAlchemy(TestCase):
     def test_get_neem_ids(self):
         neem_ids = self.nq.session.query(Neem._id).all()
         self.assertIsNotNone(neem_ids)
+
+    def test_query_changed(self):
+        query = self.nq.select_from_tasks().join_neems()
+        self.assertTrue(self.nq.query_changed)
+        result = query.get_result()
+        self.assertFalse(query.query_changed)
+        query.join_task_types()
+        self.assertTrue(query.query_changed)
