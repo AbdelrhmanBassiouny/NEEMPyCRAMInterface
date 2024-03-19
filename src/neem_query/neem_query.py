@@ -261,7 +261,15 @@ class NeemQuery:
         """
         query = None
         if len(self.selected_columns) > 0:
-            query = select(*self.selected_columns)
+            selected_columns = []
+            for col in self.selected_columns:
+                if col in column_to_label:
+                    selected_columns.append(col.label(column_to_label[col]))
+                else:
+                    if col.name != "neem_id":
+                        logging.warning(f"Column {col} not found in the column to label dictionary")
+                    selected_columns.append(col)
+            query = select(*selected_columns)
         if len(self.select_from_tables) > 0:
             if query is None:
                 query = select(*self.select_from_tables)
@@ -659,12 +667,39 @@ class NeemQuery:
         self.update_selected_columns([NeemsEnvironmentIndex.environment_values])
         return self
 
+    def select_neem_id(self) -> 'NeemQuery':
+        """
+        Select the neem_id column.
+        :return: the modified query.
+        """
+        neem_id = self.find_neem_id()
+        if neem_id is not None:
+            self.update_selected_columns([neem_id])
+        else:
+            logging.error("No neem_id found in the tables")
+            raise ValueError("No neem_id found in the tables")
+        return self
+
     def order_by_stamp(self) -> 'NeemQuery':
         """
         Order the query results by the tf header stamp column.
         :return: the modified query.
         """
         return self.order_by(TfHeader.stamp)
+
+    def order_by_interval_begin(self) -> 'NeemQuery':
+        """
+        Order the query results by the soma interval begin column.
+        :return: the modified query.
+        """
+        return self.order_by(SomaHasIntervalBegin.o)
+
+    def order_by_interval_end(self) -> 'NeemQuery':
+        """
+        Order the query results by the soma interval end column.
+        :return: the modified query.
+        """
+        return self.order_by(SomaHasIntervalEnd.o)
 
     def update_select_from_tables(self, tables: List[Table]) -> 'NeemQuery':
         """
@@ -685,11 +720,7 @@ class NeemQuery:
         """
         for col in columns:
             if col not in self.selected_columns:
-                if col in column_to_label:
-                    self.selected_columns.append(col.label(column_to_label[col]))
-                else:
-                    logging.warning(f"Column {col} not found in the column to label dictionary")
-                    self.selected_columns.append(col)
+                self.selected_columns.append(col)
         return self
 
     def table_exists(self, table: Table) -> bool:
@@ -813,6 +844,15 @@ class NeemQuery:
         if use_not_:
             cond = not_(cond)
         self.filters.append(cond)
+        return self
+
+    def filter_by_neem_id(self, neem_id: int) -> 'NeemQuery':
+        """
+        Filter the query by neem_id.
+        :param neem_id: the neem_id.
+        :return: the modified query.
+        """
+        self.filters.append(Neem.ID == neem_id)
         return self
 
     def filter(self, *filters: BinaryExpression) -> 'NeemQuery':

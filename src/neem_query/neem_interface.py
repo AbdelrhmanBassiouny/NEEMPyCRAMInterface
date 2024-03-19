@@ -80,7 +80,7 @@ class NeemInterface(NeemQuery):
         :return: The task tree of a single neem as a neem query.
         """
         # noinspection PyTypeChecker
-        self.get_task_sequence().join_neems().filter(Neem.ID == neem_id)
+        self.get_task_sequence().join_neems().filter_by_neem_id(neem_id)
         return self
 
     def get_task_sequence(self) -> NeemQuery:
@@ -90,11 +90,13 @@ class NeemInterface(NeemQuery):
         """
         self.reset()
         # noinspection PyTypeChecker
-        (self.select_task_type().select_time_columns().select(DulExecutesTask.neem_id).
+        (self.select_task_type().
+         select_time_columns().
+         select_neem_id().
          select_from_tasks().
          join_task_types().
          join_task_time_interval().
-         order_by(SomaHasIntervalBegin.o))
+         order_by_interval_begin())
         return self
 
     def get_task_data_from_all_neems(self, task: str,
