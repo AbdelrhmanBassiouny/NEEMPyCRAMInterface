@@ -65,8 +65,6 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
               filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result().df
-        pd.set_option('display.float_format', lambda x: '%.3f' % x)
-        pd.set_option('display.max_columns', None)
         self.assertIsNotNone(df)
 
     def test_get_neem(self):

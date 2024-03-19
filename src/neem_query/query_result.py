@@ -7,6 +7,8 @@ class QueryResult:
     """
     A class to hold and process the result of a query in a pandas DataFrame.
     """
+    pd.set_option('display.float_format', lambda x: '%.3f' % x)
+    pd.set_option('display.max_columns', None)
 
     def __init__(self, df: pd.DataFrame):
         """
