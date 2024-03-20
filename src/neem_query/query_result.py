@@ -69,6 +69,54 @@ class QueryResult:
         """
         return self.filter_dataframe({CL.subtask.value: subtask})
 
+    def filter_by_subtask_type(self, subtask_type: str) -> 'QueryResult':
+        """
+        Get the data of a certain subtask type from the query result DataFrame.
+        :param subtask_type: the subtask type.
+        :return: the data of the subtask type.
+        """
+        return self.filter_dataframe({CL.subtask_type.value: subtask_type})
+
+    def filter_by_task_parameter(self, task_parameter: str) -> 'QueryResult':
+        """
+        Get the data of a certain task parameter from the query result DataFrame.
+        :param task_parameter: the task parameter.
+        :return: the data of the task parameter.
+        """
+        return self.filter_dataframe({CL.task_parameter.value: task_parameter})
+
+    def filter_by_task_parameter_category(self, task_parameter_category: str) -> 'QueryResult':
+        """
+        Get the data of a certain task parameter category from the query result DataFrame.
+        :param task_parameter_category: the task parameter category.
+        :return: the data of the task parameter category.
+        """
+        return self.filter_dataframe({CL.task_parameter_category.value: task_parameter_category})
+
+    def filter_by_task_parameter_type(self, task_parameter_type: str) -> 'QueryResult':
+        """
+        Get the data of a certain task parameter type from the query result DataFrame.
+        :param task_parameter_type: the task parameter type.
+        :return: the data of the task parameter type.
+        """
+        return self.filter_dataframe({CL.task_parameter_type.value: task_parameter_type})
+
+    def filter_by_agent(self, agent: str) -> 'QueryResult':
+        """
+        Get the data of a certain agent from the query result DataFrame.
+        :param agent: the agent.
+        :return: the data of the agent.
+        """
+        return self.filter_dataframe({CL.agent.value: agent})
+
+    def filter_by_agent_type(self, agent_type: str) -> 'QueryResult':
+        """
+        Get the data of a certain agent type from the query result DataFrame.
+        :param agent_type: the agent type.
+        :return: the data of the agent type.
+        """
+        return self.filter_dataframe({CL.agent_type.value: agent_type})
+
     def filter_dataframe(self, filters: dict) -> 'QueryResult':
         """
         Filter a DataFrame by a dictionary of filters
@@ -112,18 +160,59 @@ class QueryResult:
 
     def get_participants_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
         """
+        Get the participants in each NEEM from the query result DataFrame.
+        :param unique: whether to return unique participants or not.
+        :return: the participants in each NEEM.
+        """
+        return self.get_column_value_per_neem(CL.participant.value, unique)
+
+    def get_participant_types_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+        """
         Get the participant_types in each NEEM from the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
         :return: the participant_types in each NEEM.
         """
+        return self.get_column_value_per_neem(CL.participant_type.value, unique)
+
+    def get_agents_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+        """
+        Get the agents in each NEEM from the query result DataFrame.
+        :param unique: whether to return unique agents or not.
+        :return: the agents in each NEEM.
+        """
+        return self.get_column_value_per_neem(CL.agent.value, unique)
+
+    def get_agent_types_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+        """
+        Get the agent_types in each NEEM from the query result DataFrame.
+        :param unique: whether to return unique agent_types or not.
+        :return: the agent_types in each NEEM.
+        """
+        return self.get_column_value_per_neem(CL.agent_type.value, unique)
+
+    def get_column_value_per_neem(self, entity: str, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+        """
+        Get a specific entity (participant, agent, ...etc.) in each NEEM from the query result DataFrame.
+        :param entity: the entity to get.
+        :param unique: whether to return unique entities or not.
+        :return: the entities in each NEEM.
+        """
         neem_ids = self.get_neem_ids()
-        participants_per_neem = []
+        entities_per_neem = []
         for neem_id in neem_ids:
-            participants = self.filter_by_neem_id(neem_id).get_participants(unique)
-            participants_per_neem.extend([(neem_id, p) for p in participants])
-        return participants_per_neem
+            entities = self.filter_by_neem_id(neem_id).get_column_values(entity, unique)
+            entities_per_neem.extend([(neem_id, neem_entity) for neem_entity in entities])
+        return entities_per_neem
 
     def get_participants(self, unique: Optional[bool] = True) -> List[str]:
+        """
+        Get the participants in the query result DataFrame.
+        :param unique: whether to return unique participants or not.
+        :return: the participants in the NEEM.
+        """
+        return self.get_column_values(CL.participant.value, unique)
+
+    def get_participant_types(self, unique: Optional[bool] = True) -> List[str]:
         """
         Get the participant_types in the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
@@ -272,6 +361,31 @@ class QueryResult:
         :return: the time interval end in the NEEM.
         """
         return self.get_column_values(CL.time_interval_end.value, False)
+
+    def get_agents(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the agents in the query result DataFrame.
+        :param unique: whether to return unique agents or not.
+        :return: the agents in the NEEM.
+        """
+        return self.get_column_values(CL.agent.value, unique)
+
+    def get_agent_types(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the agent types in the query result DataFrame.
+        :param unique: whether to return unique agent types or not.
+        :return: the agent types in the NEEM.
+        """
+        return self.get_column_values(CL.agent_type.value, unique)
+
+    def get_tasks_of_agent(self, agent: str, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the tasks of a certain agent from the query result DataFrame.
+        :param agent: the agent name.
+        :param unique: whether to return unique tasks or not.
+        :return: the tasks.
+        """
+        return self.filter_by_participant(agent).get_tasks(unique)
 
     def get_column_values(self, column: str, unique: Optional[bool] = False) -> List[Any]:
         """

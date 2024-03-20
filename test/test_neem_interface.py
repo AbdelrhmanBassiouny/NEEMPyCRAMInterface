@@ -36,7 +36,7 @@ class TestNeemInterface(TestCase):
         self.assertTrue(len(neem_df) > 0)
 
     def test_get_participants(self):
-        participants = self.all_neem_plans.get_participants()
+        participants = self.all_neem_plans.get_participant_types()
         self.assertIsInstance(participants, list)
         self.assertTrue(len(participants) > 0)
 

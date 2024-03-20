@@ -8,6 +8,10 @@ ParticipantType = aliased(RdfType, name='ParticipantType')
 SubTask = aliased(DulExecutesTask, name='SubTask')
 SubTaskType = aliased(RdfType, name='SubTaskType')
 TaskParameterType = aliased(RdfType, name='TaskParameterType')
+TaskParameterCategory = aliased(DulClassify, name='TaskParameterCategory')
+Agent = aliased(DulClassify, name='Agent')
+AgentType = aliased(RdfType, name='AgentType')
+
 Initialized = None
 
 
@@ -40,6 +44,9 @@ class ColumnLabel(Enum):
     task_parameter = "task_parameter"
     task_parameter_category = "task_parameter_category"
     task_parameter_type = "task_parameter_type"
+    agent = "agent"
+    agent_type = "agent_type"
+    neem_sql_id = "neem_sql_id"
 
 
 column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
@@ -61,13 +68,15 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    UrdfHasBaseLink.urdf_Link_o: ColumnLabel.participant_base_link.value,
                    NeemsEnvironmentIndex.environment_values: ColumnLabel.environment.value,
                    Neem._id: ColumnLabel.neem_id.value,
-                   Neem.ID: ColumnLabel.neem_id.value,
+                   Neem.ID: ColumnLabel.neem_sql_id.value,
                    DulHasTimeInterval.dul_TimeInterval_o: ColumnLabel.time_interval.value,
                    SomaHasIntervalBegin.o: ColumnLabel.time_interval_begin.value,
                    SomaHasIntervalEnd.o: ColumnLabel.time_interval_end.value,
                    DulHasParameter.dul_Parameter_o: ColumnLabel.task_parameter_category.value,
                    DulClassify.dul_Entity_o: ColumnLabel.task_parameter.value,
-                   TaskParameterType.o: ColumnLabel.task_parameter_type.value}
+                   TaskParameterType.o: ColumnLabel.task_parameter_type.value,
+                   Agent.dul_Entity_o: ColumnLabel.agent.value,
+                   AgentType.o: ColumnLabel.agent_type.value}
 
 
 # loop over the attributes of all classes in the neems_database module,

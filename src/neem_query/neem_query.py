@@ -6,7 +6,8 @@ from sqlalchemy import (create_engine, Engine, between, and_, func, Table, Binar
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
-from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask, TaskParameterType
+from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask, TaskParameterType, \
+    TaskParameterCategory, Agent, AgentType
 from .neems_database import *
 from .query_result import QueryResult
 
@@ -268,8 +269,8 @@ class NeemQuery:
                     selected_columns.append(col.label(column_to_label[col]))
                 else:
                     if col.name != "neem_id":
-                        logging.warning(f"Column {col} not found in the column to label dictionary")
-                    selected_columns.append(col)
+                        logging.debug(f"Column {col} not found in the column to label dictionary")
+                    selected_columns.append(col.label(col.table.name + '_' + col.name))
             query = select(*selected_columns)
         if len(self.select_from_tables) > 0:
             if query is None:
@@ -360,23 +361,6 @@ class NeemQuery:
         :return: the modified query.
         """
         return self.join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o, is_outer=is_outer)
-
-    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column,
-                  is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join a type table.
-        :param type_table: the type table.
-        :param type_of_table: the table to join on.
-        :param type_of_column: the column to join on.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        joins = {type_table: and_(type_table.s == type_of_column,
-                                  type_table.neem_id == type_of_table.neem_id,
-                                  type_table.o != "owl:NamedIndividual")}
-        outer_join = {type_table: is_outer}
-        self._update_joins_metadata(joins, outer_joins=outer_join)
-        return self
 
     def join_participant_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -546,21 +530,70 @@ class NeemQuery:
         :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {DulClassify: and_(DulClassify.dul_Concept_s == DulHasParameter.dul_Parameter_o,
-                                   DulClassify.neem_id == DulHasParameter.neem_id)}
-        outer_join = {DulClassify: is_outer}
+        joins = {TaskParameterCategory: and_(TaskParameterCategory.dul_Concept_s == DulHasParameter.dul_Parameter_o,
+                                             TaskParameterCategory.neem_id == DulHasParameter.neem_id)}
+        outer_join = {TaskParameterCategory: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
     def join_task_parameter_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
-        Join the task parameter type table. Assumes DulClassify has been joined/selected already.
+        Join the task parameter type table. Assumes TaskParameterCategory has been joined/selected already.
         :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {TaskParameterType: and_(TaskParameterType.s == DulClassify.dul_Entity_o,
-                                         TaskParameterType.neem_id == DulClassify.neem_id)}
+        joins = {TaskParameterType: and_(TaskParameterType.s == TaskParameterCategory.dul_Entity_o,
+                                         TaskParameterType.neem_id == TaskParameterCategory.neem_id)}
         outer_join = {TaskParameterType: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_all_agent_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the agent data.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_agent(is_outer=is_outer).
+         join_agent_type(is_outer=is_outer))
+        return self
+
+    def join_agent(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the agent table. Assumes DulExecutesTask has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {DulIsTaskOf: and_(DulIsTaskOf.dul_Task_s == DulExecutesTask.dul_Task_o,
+                                   DulIsTaskOf.neem_id == DulExecutesTask.neem_id),
+                 Agent: and_(Agent.dul_Concept_s == DulIsTaskOf.dul_Role_o,
+                             Agent.neem_id == DulExecutesTask.neem_id)}
+        outer_join = {DulIsTaskOf: is_outer, Agent: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_agent_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the agent type table. Assumes Agent has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self.join_type(AgentType, Agent, Agent.dul_Entity_o, is_outer=is_outer)
+
+    def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column,
+                  is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join a type table.
+        :param type_table: the type table.
+        :param type_of_table: the table to join on.
+        :param type_of_column: the column to join on.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {type_table: and_(type_table.s == type_of_column,
+                                  type_table.neem_id == type_of_table.neem_id,
+                                  type_table.o != "owl:NamedIndividual")}
+        outer_join = {type_table: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
@@ -736,6 +769,22 @@ class NeemQuery:
         :return: the modified query.
         """
         self.update_selected_columns(Neem.__table__.columns)
+        return self
+
+    def select_agent(self) -> 'NeemQuery':
+        """
+        Select agent instances column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([Agent.dul_Entity_o])
+        return self
+
+    def select_agent_type(self) -> 'NeemQuery':
+        """
+        Select agent type column.
+        :return: the modified query.
+        """
+        self.select_type(AgentType)
         return self
 
     def order_by_stamp(self) -> 'NeemQuery':
@@ -990,7 +1039,6 @@ class NeemQuery:
         """
         tables = list(self.joins.keys()) + self.select_from_tables
         if as_str:
-
             return [table.ID.table.name for table in tables]
         return tables
 

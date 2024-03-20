@@ -1,17 +1,17 @@
 import logging
 import time
-from typing import List, Tuple
 
 import rospy
 from pycram.datastructures.enums import ObjectType
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
 from pycram.world_concepts.world_object import Object
-from typing_extensions import Optional, Dict
+from typing_extensions import Optional, Dict, Tuple, List, Callable
 
 from .neem_interface import NeemInterface
 from .query_result import QueryResult
 from .utils import ModuleInspector
+from .enums import ColumnLabel as CL
 
 
 action_designator_inspector = ModuleInspector(action_designator)
@@ -54,6 +54,23 @@ class PyCRAMNEEMInterface(NeemInterface):
          One could use the get_plan_of_neem to get the data. Then filter it as needed.
         """
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
+        agent_objects = self.get_and_spawn_agents()
+        tasks = self.query_result.get_column_value_per_neem(CL.task_type.value)
+        for neem_id, participant, task, parameters, current_time in zip(self.get_neem_ids(unique=False),
+                                                                        self.get_participants(unique=False),
+                                                                        tasks,
+                                                                        self.query_result.get_column_value_per_neem(CL.task_parameter.value),
+                                                                        self.get_stamp()):
+            # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
+            # TODO: Create designators for objects.
+            if task in soma_to_pycram:
+                action = soma_to_pycram[task]
+                action_description = action(parameters)
+                action_description.ground()
+                action_description.resolve()
+                action_description.perform()
+            else:
+                logging.warning(f'No action found for task {task}')
 
     def replay_neem_motions(self):
         """
@@ -66,7 +83,7 @@ class PyCRAMNEEMInterface(NeemInterface):
 
         poses = self.get_poses()
         times = self.get_stamp()
-        participant_instances = self.get_participants(unique=False)
+        participant_instances = self.get_participant_types(unique=False)
         neem_ids = self.get_neem_ids(unique=False)
 
         prev_time = 0
@@ -92,25 +109,67 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get and spawn the environment in the NEEM using PyCRAM.
         :return: the environment as a PyCRAM object.
         """
-        query_result = self.get_result()
-        environments = query_result.get_environments()
-        # print(environments)
+        environments = self.query_result.get_environments()
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
+
+    def get_and_spawn_agents(self) -> Dict[Tuple[str, str], Object]:
+        """
+        Get and spawn the agents in the NEEM using PyCRAM.
+        :return: the agents as a dictionary of PyCRAM objects.
+        """
+        return self.get_and_spawn_entities(CL.agent_type.value, self.get_description_of_agent,
+                                           lambda _: ObjectType.ROBOT)
 
     def get_and_spawn_participants(self) -> Dict[Tuple[str, str], Object]:
         """
         Get and spawn the participants in the NEEM using PyCRAM.
         :return: the participants as a dictionary of PyCRAM objects.
         """
-        participants = self.query_result.get_participants_per_neem()
-        # print(participants)
-        participant_objects = {}
-        for neem, participant in participants:
-            participant_description = self.get_description_of_participant(participant)
-            participant_object = Object(participant, self.get_object_type(participant), participant_description)
-            participant_objects[(neem, participant)] = participant_object
-        return participant_objects
+        return self.get_and_spawn_entities(CL.participant_type.value, self.get_description_of_participant,
+                                           self.get_object_type)
+
+    def get_and_spawn_entities(self, entity: str, description_getter: Callable[str, str],
+                               object_type_getter: Callable[str, ObjectType]) -> Dict[Tuple[str, str], Object]:
+        """
+        Get and spawn the entities in the NEEM using PyCRAM.
+        :param entity: the entity to get and spawn.
+        :param description_getter: the function to get the description of the entity.
+        :param object_type_getter: the function to get the type of the entity.
+        :return: the entities as a dictionary of PyCRAM objects.
+        """
+        entities = self.query_result.get_column_value_per_neem(entity)
+        entity_objects = {}
+        for neem, entity in entities:
+            description = description_getter(entity)
+            entity_object = Object(entity, object_type_getter(entity), description)
+            entity_objects[(neem, entity)] = entity_object
+        return entity_objects
+
+    @staticmethod
+    def get_description_of_agent(agent: str) -> str:
+        """
+        Get the description of an agent.
+        :param agent: the agent to get the description of.
+        :return: the description of the agent.
+        """
+        if 'pr2' in agent.lower():
+            return 'pr2.urdf'
+        elif 'boxy' in agent.lower():
+            return 'boxy.urdf'
+        elif 'hsrb' in agent.lower():
+            return 'hsrb.urdf'
+        elif 'donbot' in agent.lower():
+            return 'iai_donbot.urdf'
+        elif 'tiago' in agent.lower():
+            return 'tiago_dual.urdf'
+        elif 'ur5e' in agent.lower():
+            return 'ur5e_without_gripper.urdf'
+        elif 'ur5' in agent.lower():
+            return 'ur5_robotiq.urdf'
+        else: #
+            logging.debug(f'No description found for agent {agent}')
+            raise ValueError(f'No description found for agent {agent}')
 
     @staticmethod
     def get_description_of_participant(participant: str) -> str:
@@ -131,6 +190,8 @@ class PyCRAMNEEMInterface(NeemInterface):
             return 'Static_CokeBottle.stl'
         elif 'cereal' in participant.lower():
             return 'cereal.stl'
+        elif 'spoon' in participant.lower():
+            return 'spoon.stl'
         else:
             logging.error(f'No description found for participant {participant}')
             raise ValueError(f'No description found for participant {participant}')
@@ -200,11 +261,19 @@ class PyCRAMNEEMInterface(NeemInterface):
 
     def get_participants(self, unique: Optional[bool] = True) -> List[str]:
         """
+        Get the participants in the query result DataFrame.
+        :param unique: whether to return unique participants or not.
+        :return: the participants in the NEEM.
+        """
+        return self.query_result.get_participants(unique)
+
+    def get_participant_types(self, unique: Optional[bool] = True) -> List[str]:
+        """
         Get the participant_types in the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
         :return: the participant_types in the NEEM.
         """
-        return self.query_result.get_participants(unique)
+        return self.query_result.get_participant_types(unique)
 
     def get_neem_ids(self, unique: Optional[bool] = True) -> List[str]:
         """
