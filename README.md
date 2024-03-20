@@ -10,7 +10,9 @@ or SQL users in general.
 All below examples assume the neems are located in a 'test' database at 'localhost' which can be accessed by 'newuser'
 using password 'password'.
 
-### Getting a robot plan for a certain neem (Highest Abstraction Level):
+### Getting a robot plan for a certain neem:
+
+#### Highest Abstraction Level:
 
 This is done by using the NeemInterface class which provides a higher level of abstraction and hides the complexity of
 the underlying SQL queries.
@@ -26,7 +28,7 @@ df = ni.get_task_sequence_of_neem(neem_id).get_result().df
 print(df)
 ```
 
-### Getting a robot plan for a certain neem using (Medium Abstraction Level):
+#### Medium Abstraction Level:
 
 This is done by using the NeemQuery class directly and using predefined joins and filters to build the query.
 
@@ -49,7 +51,7 @@ df = (nq.select_task_type().
 print(df)
 ```
 
-### Getting a robot plan for a certain neem (Lowest Abstraction Level):
+#### Lowest Abstraction Level:
 
 This is done by using the NeemQuery class directly and explicitly writing the SQL query with the correct join conditions
 and column names and table names.
