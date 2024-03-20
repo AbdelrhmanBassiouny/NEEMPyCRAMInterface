@@ -3,10 +3,11 @@ from .neems_database import *
 from sqlalchemy.orm import aliased
 
 
-TaskType = aliased(RdfType)
-ParticipantType = aliased(RdfType)
-SubTaskType = aliased(RdfType)
-SubTask = aliased(DulExecutesTask)
+TaskType = aliased(RdfType, name='TaskType')
+ParticipantType = aliased(RdfType, name='ParticipantType')
+SubTask = aliased(DulExecutesTask, name='SubTask')
+SubTaskType = aliased(RdfType, name='SubTaskType')
+TaskParameterType = aliased(RdfType, name='TaskParameterType')
 Initialized = None
 
 
@@ -37,6 +38,7 @@ class ColumnLabel(Enum):
     time_interval_begin = "begin"
     time_interval_end = "end"
     task_parameter = "task_parameter"
+    task_parameter_category = "task_parameter_category"
     task_parameter_type = "task_parameter_type"
 
 
@@ -63,8 +65,9 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    DulHasTimeInterval.dul_TimeInterval_o: ColumnLabel.time_interval.value,
                    SomaHasIntervalBegin.o: ColumnLabel.time_interval_begin.value,
                    SomaHasIntervalEnd.o: ColumnLabel.time_interval_end.value,
-                   DulHasParameter.dul_Parameter_o: ColumnLabel.task_parameter.value,
-                   DulClassify.dul_Entity_o: ColumnLabel.task_parameter_type.value}
+                   DulHasParameter.dul_Parameter_o: ColumnLabel.task_parameter_category.value,
+                   DulClassify.dul_Entity_o: ColumnLabel.task_parameter.value,
+                   TaskParameterType.o: ColumnLabel.task_parameter_type.value}
 
 
 # loop over the attributes of all classes in the neems_database module,

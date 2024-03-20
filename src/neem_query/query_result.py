@@ -1,5 +1,9 @@
 from typing import List, Tuple, Optional
+
+import numpy as np
 import pandas as pd
+from typing_extensions import Any
+
 from .enums import ColumnLabel as CL
 
 
@@ -49,6 +53,22 @@ class QueryResult:
         """
         return self.filter_dataframe({CL.task.value: task})
 
+    def filter_by_task_type(self, task_type: str) -> 'QueryResult':
+        """
+        Get the data of a certain task type from the query result DataFrame.
+        :param task_type: the task type.
+        :return: the data of the task type.
+        """
+        return self.filter_dataframe({CL.task_type.value: task_type})
+
+    def filter_by_subtask(self, subtask: str) -> 'QueryResult':
+        """
+        Get the data of a certain subtask from the query result DataFrame.
+        :param subtask: the subtask name.
+        :return: the data of the subtask.
+        """
+        return self.filter_dataframe({CL.subtask.value: subtask})
+
     def filter_dataframe(self, filters: dict) -> 'QueryResult':
         """
         Filter a DataFrame by a dictionary of filters
@@ -88,10 +108,7 @@ class QueryResult:
         :param unique: whether to return unique NEEM IDs or not.
         :return: the NEEM IDs.
         """
-        if unique:
-            return self.df[CL.neem_id.value].unique().tolist()
-        else:
-            return self.df[CL.neem_id.value].tolist()
+        return self.get_column_values(CL.neem_id.value, unique)
 
     def get_participants_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
         """
@@ -112,17 +129,15 @@ class QueryResult:
         :param unique: whether to return unique participant_types or not.
         :return: the participant_types in the NEEM.
         """
-        if unique:
-            return self.df[CL.participant.value].unique().tolist()
-        else:
-            return self.df[CL.participant.value].tolist()
+        return self.get_column_values(CL.participant_type.value, unique)
 
-    def get_environments(self) -> List[str]:
+    def get_environments(self, unique: Optional[bool] = True) -> List[str]:
         """
         Get the environments in the query result DataFrame.
+        :param unique: whether to return unique environments or not.
         :return: the environment in the NEEM.
         """
-        return self.df[CL.environment.value].unique().tolist()
+        return self.get_column_values(CL.environment.value, unique)
 
     def get_stamp(self) -> List[float]:
         """
@@ -161,3 +176,130 @@ class QueryResult:
         return (self.df[CL.orientation_x.value].tolist(), self.df[CL.orientation_y.value].tolist(),
                 self.df[CL.orientation_z.value].tolist(),
                 self.df[CL.orientation_w.value].tolist())
+
+    def get_all_subtask_types_of_task_type(self, task_type: str, unique: Optional[bool] = True) -> List[str]:
+        """
+        Get all subtasks of a certain task type from the query result DataFrame.
+        :param task_type: the task type.
+        :param unique: whether to return unique subtasks or not.
+        :return: the subtasks.
+        """
+        return self.filter_by_task_type(task_type).get_subtask_types(unique=unique)
+
+    def get_all_task_types_of_subtask_type(self, subtask_type: str, unique: Optional[bool] = True) -> List[str]:
+        """
+        Get all task types of a certain subtask type from the query result DataFrame.
+        :param subtask_type: the subtask type.
+        :param unique: whether to return unique task types or not.
+        :return: the task types.
+        """
+        return self.filter_by_subtask(subtask_type).get_task_types(unique=unique)
+
+    def get_tasks(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the tasks in the query result DataFrame.
+        :param unique: whether to return unique tasks or not.
+        :return: the tasks in the NEEM.
+        """
+        return self.get_column_values(CL.task.value, unique)
+
+    def get_task_types(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the task types in the query result DataFrame.
+        :param unique: whether to return unique task types or not.
+        :return: the task types in the NEEM.
+        """
+        return self.get_column_values(CL.task_type.value, unique)
+
+    def get_subtasks(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the subtasks in the query result DataFrame.
+        :param unique: whether to return unique subtasks or not.
+        :return: the subtasks in the NEEM.
+        """
+        return self.get_column_values(CL.subtask.value, unique)
+
+    def get_subtask_types(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the subtask types in the query result DataFrame.
+        :param unique: whether to return unique subtask types or not.
+        :return: the subtask types in the NEEM.
+        """
+        return self.get_column_values(CL.subtask_type.value, unique)
+
+    def get_task_parameters(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the task parameters in the query result DataFrame.
+        :param unique: whether to return unique task parameters or not.
+        :return: the task parameters in the NEEM.
+        """
+        return self.get_column_values(CL.task_parameter.value, unique)
+
+    def get_task_parameter_categories(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the task parameter categories in the query result DataFrame.
+        :param unique: whether to return unique task parameter categories or not.
+        :return: the task parameter categories in the NEEM.
+        """
+        return self.get_column_values(CL.task_parameter_category.value, unique)
+
+    def get_task_parameter_types(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the task parameter types in the query result DataFrame.
+        :param unique: whether to return unique task parameter types or not.
+        :return: the task parameter types in the NEEM.
+        """
+        return self.get_column_values(CL.task_parameter_type.value, unique)
+
+    def get_time_intervals(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the time intervals in the query result DataFrame.
+        :param unique: whether to return unique time intervals or not.
+        :return: the time intervals in the NEEM.
+        """
+        return self.get_column_values(CL.time_interval.value, unique)
+
+    def get_time_interval_begin(self) -> List[str]:
+        """
+        Get the time interval begin in the query result DataFrame.
+        :return: the time interval begin in the NEEM.
+        """
+        return self.get_column_values(CL.time_interval_begin.value, False)
+
+    def get_time_interval_end(self) -> List[str]:
+        """
+        Get the time interval end in the query result DataFrame.
+        :return: the time interval end in the NEEM.
+        """
+        return self.get_column_values(CL.time_interval_end.value, False)
+
+    def get_column_values(self, column: str, unique: Optional[bool] = False) -> List[Any]:
+        """
+        Get a column from the query result DataFrame.
+        :param column: the column to get.
+        :param unique: whether to return unique values or not.
+        :return: the column values.
+        """
+        if unique:
+            return self.df[column].unique().tolist()
+        else:
+            return self.df[column].tolist()
+
+    def get_multi_column_values(self, columns: List[str], unique: Optional[bool] = False) -> np.ndarray:
+        """
+        Get multiple columns from the query result DataFrame.
+        :param columns: the columns to get.
+        :param unique: whether to return unique values or not.
+        :return: the column values.
+        """
+        if unique:
+            return self.df[columns].drop_duplicates().values
+        else:
+            return self.df[columns].values
+
+    def get_columns(self) -> List[str]:
+        """
+        Get the columns of the query result DataFrame.
+        :return: the columns.
+        """
+        return self.df.columns.tolist()

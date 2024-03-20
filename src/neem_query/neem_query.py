@@ -6,7 +6,7 @@ from sqlalchemy import (create_engine, Engine, between, and_, func, Table, Binar
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
-from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask
+from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask, TaskParameterType
 from .neems_database import *
 from .query_result import QueryResult
 
@@ -33,6 +33,7 @@ class NeemQuery:
         self.select_from_tables: Optional[List[Table]] = []
         self.latest_executed_query: Optional[Select] = None
         self.latest_result: Optional[QueryResult] = None
+        self._distinct = False
 
     def get_task(self, task: str) -> DulExecutesTask:
         """
@@ -275,6 +276,8 @@ class NeemQuery:
                 query = select(*self.select_from_tables)
             else:
                 query = query.select_from(*self.select_from_tables)
+        if self._distinct:
+            query = query.distinct()
         for table, on in self.joins.items():
             query = query.join(table, on, isouter=self.outer_joins.get(table, False))
         if self._limit is not None:
@@ -283,6 +286,16 @@ class NeemQuery:
             query = query.order_by(self._order_by)
         self.query = self._filter(query, self.in_filters, self.remove_filters, self.filters)
         return self.query
+
+    def join_all_subtasks_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the subtasks data.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_subtasks(is_outer=is_outer).
+         join_subtask_type(is_outer=is_outer))
+        return self
 
     def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -293,13 +306,19 @@ class NeemQuery:
         joins = {DulHasConstituent:
                      and_(DulHasConstituent.dul_Entity_s == DulExecutesTask.dul_Action_s,
                           DulHasConstituent.neem_id == DulExecutesTask.neem_id),
-                 SubTask:
-                     and_(SubTask.dul_Action_s == DulHasConstituent.dul_Entity_o,
-                          SubTask.neem_id == DulExecutesTask.neem_id)}
+                 SubTask: and_(SubTask.dul_Action_s == DulHasConstituent.dul_Entity_o,
+                               SubTask.neem_id == DulExecutesTask.neem_id)}
         outer_join = {DulHasConstituent: is_outer, SubTask: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
-        self.join_type(SubTaskType, SubTask, SubTask.dul_Task_o, is_outer=is_outer)
         return self
+
+    def join_subtask_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the subtask type table. Assumes subtasks have been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self.join_type(SubTaskType, SubTask, SubTask.dul_Task_o, is_outer=is_outer)
 
     def join_all_task_participants_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -498,7 +517,18 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
-    def join_task_parameter(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_all_task_parameter_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the task parameter data.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_task_parameter_category(is_outer=is_outer).
+         join_task_parameter(is_outer=is_outer).
+         join_task_parameter_type(is_outer=is_outer))
+        return self
+
+    def join_task_parameter_category(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join the task parameter table. Assumes DulExecutesTask has been joined/selected already.
         :param is_outer: whether to use outer join or not.
@@ -510,7 +540,7 @@ class NeemQuery:
         self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
-    def join_parameter_classification(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_task_parameter(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join the task parameter classification table. Assumes DulHasParameter has been joined/selected already.
         :param is_outer: whether to use outer join or not.
@@ -519,6 +549,18 @@ class NeemQuery:
         joins = {DulClassify: and_(DulClassify.dul_Concept_s == DulHasParameter.dul_Parameter_o,
                                    DulClassify.neem_id == DulHasParameter.neem_id)}
         outer_join = {DulClassify: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_task_parameter_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the task parameter type table. Assumes DulClassify has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {TaskParameterType: and_(TaskParameterType.s == DulClassify.dul_Entity_o,
+                                         TaskParameterType.neem_id == DulClassify.neem_id)}
+        outer_join = {TaskParameterType: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
 
@@ -628,7 +670,7 @@ class NeemQuery:
         self.update_selected_columns([type_table.o])
         return self
 
-    def select_parameter_type(self) -> 'NeemQuery':
+    def select_parameter_category(self) -> 'NeemQuery':
         """
         Select task parameter type column.
         :return: the modified query.
@@ -642,6 +684,14 @@ class NeemQuery:
         :return: the modified query.
         """
         self.update_selected_columns([DulClassify.dul_Entity_o])
+        return self
+
+    def select_parameter_type(self) -> 'NeemQuery':
+        """
+        Select task parameter type column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([TaskParameterType.o])
         return self
 
     def select_stamp(self) -> 'NeemQuery':
@@ -678,6 +728,14 @@ class NeemQuery:
         else:
             logging.error("No neem_id found in the tables")
             raise ValueError("No neem_id found in the tables")
+        return self
+
+    def select_neem_meta_data(self) -> 'NeemQuery':
+        """
+        Select the neem meta data columns.
+        :return: the modified query.
+        """
+        self.update_selected_columns(Neem.__table__.columns)
         return self
 
     def order_by_stamp(self) -> 'NeemQuery':
@@ -916,6 +974,26 @@ class NeemQuery:
         self.update_select_from_tables(tables)
         return self
 
+    def distinct(self) -> 'NeemQuery':
+        """
+        Distinct the query.
+        :return: the modified query.
+        """
+        self._distinct = True
+        return self
+
+    def get_all_joined_and_selected_tables(self, as_str: Optional[bool] = False) -> List[Table]:
+        """
+        Get all the joined and selected tables.
+        :param as_str: whether to return the tables as strings or not.
+        :return: the tables.
+        """
+        tables = list(self.joins.keys()) + self.select_from_tables
+        if as_str:
+
+            return [table.ID.table.name for table in tables]
+        return tables
+
     def reset(self):
         """
         Reset the query.
@@ -932,6 +1010,7 @@ class NeemQuery:
         self.select_from_tables = []
         self.latest_executed_query = None
         self.latest_result = None
+        self._distinct = False
 
     def __eq__(self, other):
         return self.construct_query() == other.construct_query()

@@ -1,19 +1,38 @@
 import logging
 import time
+from typing import List, Tuple
 
+import rospy
+from pycram.datastructures.enums import ObjectType
+from pycram.datastructures.pose import Pose, Transform
+from pycram.designators import action_designator
+from pycram.world_concepts.world_object import Object
 from typing_extensions import Optional, Dict
 
 from .neem_interface import NeemInterface
-from .neems_database import *
-import pandas as pd
-from typing import List, Tuple
-import rospy
-
-from pycram.datastructures.pose import Pose, Transform
-from pycram.datastructures.enums import ObjectType
-from pycram.world_concepts.world_object import Object
-
 from .query_result import QueryResult
+from .utils import ModuleInspector
+
+
+action_designator_inspector = ModuleInspector(action_designator)
+pycram_actions = action_designator_inspector.get_all_classes_dict()
+
+soma_to_pycram = {'soma:Grasping': pycram_actions['GraspingAction'],
+                  'soma:PositioningArm': pycram_actions['ParkArmsAction'],
+                  'soma:SettingGripper': pycram_actions['SetGripperAction'],
+                  'soma:LookingAt': pycram_actions['LookAtAction'],
+                  'soma:Releasing': pycram_actions['ReleaseAction'],
+                  'soma:PickingUp': pycram_actions['PickUpAction'],
+                  'soma:Placing': pycram_actions['PlaceAction'],
+                  'soma:Gripping': pycram_actions['GripAction'],
+                  'soma:Closing': pycram_actions['CloseAction'],
+                  'soma:Opening': pycram_actions['OpenAction'],
+                  'soma:OpeningGripper': pycram_actions['SetGripperAction'],
+                  'soma:Navigating': pycram_actions['NavigateAction'],
+                  'soma:Delivering': pycram_actions['TransportAction'],
+                  'soma:Detecting': pycram_actions['DetectAction'],
+                  'soma:AssumingArmPose:': pycram_actions['ParkArmsAction'],
+                  }
 
 
 class PyCRAMNEEMInterface(NeemInterface):
@@ -28,15 +47,22 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         super().__init__(db_url)
 
+    def redo_neem_plan(self):
+        """
+        Redo NEEM actions using PyCRAM. The query should contain:
+         neem_id, participant, action, parameters, stamp.
+         One could use the get_plan_of_neem to get the data. Then filter it as needed.
+        """
+        environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
+
     def replay_neem_motions(self):
         """
         Replay NEEMs using PyCRAM. The query should contain:
          neem_id, environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         """
-        environment_obj = self.get_and_spawn_environment()
 
-        participant_objects = self.get_and_spawn_participants()
+        environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
 
         poses = self.get_poses()
         times = self.get_stamp()
@@ -52,6 +78,14 @@ class PyCRAMNEEMInterface(NeemInterface):
                 time.sleep(wait_time)
             prev_time = current_time
             participant_objects[(neem_id, participant)].set_pose(pose)
+
+    def get_and_spawn_environment_and_participants(self):
+        """
+        Get and spawn the environment and participants in the NEEM using PyCRAM.
+        """
+        environment_obj = self.get_and_spawn_environment()
+        participant_objects = self.get_and_spawn_participants()
+        return environment_obj, participant_objects
 
     def get_and_spawn_environment(self) -> Object:
         """

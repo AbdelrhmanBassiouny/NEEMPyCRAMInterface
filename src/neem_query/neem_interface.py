@@ -67,10 +67,10 @@ class NeemInterface(NeemQuery):
         Get all the plans in the database.
         :return: The plans as a neem query.
         """
-        (self.get_task_sequence().select_subtask_type().select_participant_type().select_parameter().
-         join_subtasks(is_outer=True).
+        (self.get_task_sequence().select_subtask_type().select_participant_type().select_parameter_type().
+         join_all_subtasks_data(is_outer=True).
          join_all_task_participants_data(is_outer=True).
-         join_task_parameter(is_outer=True).join_parameter_classification(is_outer=True))
+         join_all_task_parameter_data(is_outer=True))
         return self
 
     def get_task_sequence_of_neem(self, neem_id: int) -> NeemQuery:
