@@ -17,7 +17,7 @@ class TestNeemInterface(TestCase):
     def setUpClass(cls):
         # Connection to MariaDB NEEM database.
         cls.ni = NeemInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.all_neem_plans = cls.ni.get_all_plans().select_participant().get_result()
+        cls.all_neem_plans = cls.ni.get_all_plans().select_participant().select_neem_id().get_result()
 
     def test_get_neem_ids(self):
         neem_ids = self.all_neem_plans.get_neem_ids()
