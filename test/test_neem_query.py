@@ -82,3 +82,8 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertFalse(query.query_changed)
         query.join_task_types()
         self.assertTrue(query.query_changed)
+
+    def test_join_agent(self):
+        df = (self.nq.select_agent().select(Neem.ID).select_from_tasks().join_neems().join_agent()).get_result().df
+        print(df)
+        self.assertIsNotNone(df)

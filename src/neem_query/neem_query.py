@@ -6,8 +6,8 @@ from sqlalchemy import (create_engine, Engine, between, and_, func, Table, Binar
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
-from .enums import column_to_label, TaskType, ParticipantType, SubTaskType, SubTask, TaskParameterType, \
-    TaskParameterCategory, Agent, AgentType
+from .enums import (column_to_label, ColumnLabel as CL, TaskType, ParticipantType, SubTaskType, SubTask,
+                    TaskParameterType, TaskParameterCategory, Agent, AgentType)
 from .neems_database import *
 from .query_result import QueryResult
 
@@ -265,11 +265,12 @@ class NeemQuery:
         if len(self.selected_columns) > 0:
             selected_columns = []
             for col in self.selected_columns:
-                if col in column_to_label:
+                if col in column_to_label.keys():
                     selected_columns.append(col.label(column_to_label[col]))
+                elif col.name == "neem_id":
+                    selected_columns.append(col.label(CL.neem_id.value))
                 else:
-                    if col.name != "neem_id":
-                        logging.debug(f"Column {col} not found in the column to label dictionary")
+                    logging.debug(f"Column {col} not found in the column to label dictionary")
                     selected_columns.append(col.label(col.table.name + '_' + col.name))
             query = select(*selected_columns)
         if len(self.select_from_tables) > 0:
@@ -470,25 +471,26 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
-    def find_neem_id(self) -> Optional[BinaryExpression]:
+    def find_neem_id(self, look_in_selected: Optional[bool] = False) -> Optional[BinaryExpression]:
         """
         Find the neem_id column to join on from the already joined/selected tables.
+        :param look_in_selected: whether to look in the selected tables or not.
         :return: the neem_id column.
         """
         neem_id = None
-        for table in self.joins.keys():
-            if self.has_neem_id(table.ID.table):
+        for table in self.select_from_tables:
+            if self.has_neem_id(table.__table__):
                 neem_id = table.neem_id
                 break
         if neem_id is None:
+            for table in self.joins.keys():
+                if self.has_neem_id(table.__table__):
+                    neem_id = table.neem_id
+                    break
+        if neem_id is None and look_in_selected:
             for col in self.selected_columns:
                 if self.has_neem_id(col.table):
-                    neem_id = col.table.columns.neem_id
-                    break
-        if neem_id is None:
-            for table in self.select_from_tables:
-                if self.has_neem_id(table.ID.table):
-                    neem_id = table.neem_id
+                    neem_id = col.class_.neem_id
                     break
         return neem_id
 
@@ -755,7 +757,7 @@ class NeemQuery:
         Select the neem_id column.
         :return: the modified query.
         """
-        neem_id = self.find_neem_id()
+        neem_id = self.find_neem_id(look_in_selected=True)
         if neem_id is not None:
             self.update_selected_columns([neem_id])
         else:

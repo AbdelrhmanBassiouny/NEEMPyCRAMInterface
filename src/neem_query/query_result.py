@@ -395,7 +395,8 @@ class QueryResult:
         :return: the column values.
         """
         if unique:
-            return self.df[column].unique().tolist()
+            # filter from none values
+            return self.df[column].dropna().unique().tolist()
         else:
             return self.df[column].tolist()
 
