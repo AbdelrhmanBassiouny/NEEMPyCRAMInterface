@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 from dataclasses import dataclass, astuple
 
@@ -65,7 +66,7 @@ class PyCRAMNEEMInterface(NeemInterface):
          One could use the get_plan_of_neem to get the data. Then filter it as needed.
         """
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
-        agent_objects = self.get_and_spawn_agents()
+        agent_objects = self.get_and_spawn_performers()
         tasks = self.query_result.get_column_value_per_neem(CL.task_type.value)
         for neem_id, participant, task, parameters, current_time in zip(self.get_neem_ids(unique=False),
                                                                         self.get_participants(unique=False),
@@ -135,13 +136,13 @@ class PyCRAMNEEMInterface(NeemInterface):
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
 
-    def get_and_spawn_agents(self) -> Dict[Tuple[str, str], Object]:
+    def get_and_spawn_performers(self) -> Dict[Tuple[str, str], Object]:
         """
         Get and spawn the agents in the NEEM using PyCRAM.
         :return: the agents as a dictionary of PyCRAM objects.
         """
-        return self.get_and_spawn_entities(CL.agent.value,
-                                           self.get_description_of_agent,
+        return self.get_and_spawn_entities(CL.is_performed_by.value,
+                                           self.get_description_of_performer,
                                            lambda _: ObjectType.ROBOT)
 
     def get_and_spawn_participants(self) -> Dict[Tuple[str, str], Object]:
@@ -154,7 +155,7 @@ class PyCRAMNEEMInterface(NeemInterface):
                                            self.get_object_type)
 
     def get_and_spawn_entities(self, entity_column_name: str,
-                               description_getter: Callable[[str], str],
+                               description_getter: Callable[[str, str], str],
                                object_type_getter: Callable[[str], ObjectType]) -> Dict[Tuple[str, str], Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
@@ -168,7 +169,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         neem_entities = []
         for neem, neem_entity in entities:
             try:
-                description = description_getter(neem_entity)
+                description = description_getter(neem, neem_entity)
             except ValueError as e:
                 logging.warning(f'Error getting description for entity {neem_entity}: {e}')
                 continue
@@ -181,7 +182,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         return entity_objects
 
     @staticmethod
-    def get_description_of_agent(agent: str) -> str:
+    def get_description_of_performer(agent: str) -> str:
         """
         Get the description of an agent.
         :param agent: the agent to get the description of.
@@ -205,13 +206,18 @@ class PyCRAMNEEMInterface(NeemInterface):
             logging.debug(f'No description found for agent {agent}')
             raise ValueError(f'No description found for agent {agent}')
 
-    @staticmethod
-    def get_description_of_participant(participant: str) -> str:
+    def get_description_of_participant(self, neem_id: str, participant: str) -> str:
         """
         Get the description of a participant.
+        :param neem_id: the id of the NEEM.
         :param participant: the participant to get the description of.
         :return: the description of the participant.
         """
+        mesh_link = self.get_mesh_link_of_object_in_neem(neem_id, participant)
+        if mesh_link is not None:
+            download_path = self.download_mesh_file(mesh_link)
+            if download_path is not None:
+                return download_path
         if 'cup' in participant.lower():
             return 'jeroen_cup.stl'
         elif 'bowl' in participant.lower() or 'pot' in participant.lower():
@@ -229,6 +235,32 @@ class PyCRAMNEEMInterface(NeemInterface):
         else:
             logging.error(f'No description found for participant {participant}')
             raise ValueError(f'No description found for participant {participant}')
+
+    def get_mesh_link_of_object_in_neem(self, neem_id: str, object_name: str) -> str:
+        """
+        Get the mesh link of an object in a NEEM.
+        :param neem_id: The id of the NEEM.
+        :param object_name: The name of the object.
+        :return: The mesh link of the object.
+        """
+        mesh_path_df = self.query_result.filter_by_participant(object_name).filter_by_neem_id(neem_id).df
+        mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
+        if mesh_path is None:
+            return None
+        mesh_link = mesh_path.replace('package:/', self.neem_data_link)
+        return mesh_link
+
+    @staticmethod
+    def download_mesh_file(mesh_link: str) -> str:
+        """
+        Download the mesh file.
+        :param mesh_link: The link of the mesh file.
+        :return: The download path of the mesh file.
+        """
+        file_name = mesh_link.split('/')[-1]
+        download_path = os.path.join('/tmp', file_name)
+        os.system(f'wget {mesh_link} -O {download_path}')
+        return download_path
 
     @staticmethod
     def get_description_of_environment(environment: str) -> str:

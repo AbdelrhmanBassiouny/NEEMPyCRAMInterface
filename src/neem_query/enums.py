@@ -47,6 +47,8 @@ class ColumnLabel(Enum):
     agent = "agent"
     agent_type = "agent_type"
     neem_sql_id = "neem_sql_id"
+    is_performed_by = "is_performed_by"
+    object_mesh_path = "object_mesh_path"
 
 
 column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
@@ -76,7 +78,9 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    DulClassify.dul_Entity_o: ColumnLabel.task_parameter.value,
                    TaskParameterType.o: ColumnLabel.task_parameter_type.value,
                    Agent.dul_Entity_o: ColumnLabel.agent.value,
-                   AgentType.o: ColumnLabel.agent_type.value}
+                   AgentType.o: ColumnLabel.agent_type.value,
+                   SomaIsPerformedBy.dul_Agent_o: ColumnLabel.is_performed_by.value,
+                   SomaHasFilePath.o: ColumnLabel.object_mesh_path.value}
 
 
 # loop over the attributes of all classes in the neems_database module,

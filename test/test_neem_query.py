@@ -4,6 +4,7 @@ import pandas as pd
 
 from neem_query import NeemQuery, TaskType, ParticipantType
 from neem_query.neems_database import *
+from neem_query.enums import ColumnLabel as CL
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -65,7 +66,7 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
               filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result().df
-        self.assertIsNotNone(df)
+        self.assertTrue(len(df) > 0)
 
     def test_get_neem(self):
         neem = self.nq.session.query(Neem).first()
@@ -73,7 +74,7 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_get_neem_ids(self):
         neem_ids = self.nq.session.query(Neem._id).all()
-        self.assertIsNotNone(neem_ids)
+        self.assertTrue(len(neem_ids) > 0)
 
     def test_query_changed(self):
         query = self.nq.select_from_tasks().join_neems()
@@ -85,5 +86,19 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_join_agent(self):
         df = (self.nq.select_agent().select(Neem.ID).select_from_tasks().join_neems().join_agent()).get_result().df
-        print(df)
-        self.assertIsNotNone(df)
+        self.assertTrue(len(df) > 0)
+
+    def test_join_agent_types(self):
+        df = ((self.nq.select_agent_type().select(Neem.ID).select_from_tasks().
+               join_neems().join_agent().join_agent_type()).get_result().df)
+        self.assertTrue(len(df) > 0)
+
+    def test_join_is_performed_by(self):
+        df = (self.nq.select_is_performed_by().select(Neem.ID).select_from_tasks().
+              join_neems().join_is_performed_by()).get_result().df
+        self.assertTrue(len(df) > 0)
+
+    def test_join_object_mesh_path(self):
+        df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
+              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value:5}).df
+        self.assertTrue(len(df) > 0)

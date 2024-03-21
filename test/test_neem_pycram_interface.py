@@ -25,8 +25,10 @@ class TestNeemPycramInterface(TestCase):
     def setUpClass(cls):
         cls.pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
         cls.neem_qr = (cls.pni.get_task_data_from_all_neems('Pour', regexp=True).
-                       filter_by_participant_type('soma:DesignedContainer').
+                       filter_by_participant_type('soma:DesignedContainer').join_object_mesh_path().
+                       select_object_mesh_path().
                        limit(100).get_result())
+        cls.neem_qr = cls.pni.get_plan_of_neem(5).select_participant().get_result()
         cls.world = BulletWorld(mode=WorldMode.DIRECT)
         cls.vis_mark_publisher = VizMarkerPublisher()
 
@@ -38,7 +40,8 @@ class TestNeemPycramInterface(TestCase):
     def tearDown(self):
         self.pni.reset()
         self.neem_qr = (self.pni.get_task_data_from_all_neems('Pour', regexp=True).
-                        filter_by_participant_type('soma:DesignedContainer').
+                        filter_by_participant_type('soma:DesignedContainer').join_object_mesh_path().
+                        select_object_mesh_path().
                         limit(100).get_result())
 
     def test_get_and_spawn_environment(self):
@@ -50,11 +53,11 @@ class TestNeemPycramInterface(TestCase):
         self.assertIsInstance(participants, dict)
         self.assertIsInstance(list(participants.values())[0], Object)
 
-    def test_get_and_spawn_agents(self):
-        (self.pni.get_plan_of_neem(5).select_agent())
-        agents = self.pni.get_and_spawn_agents()
-        self.assertIsInstance(agents, dict)
-        self.assertIsInstance(list(agents.values())[0], Object)
+    def test_get_and_spawn_performers(self):
+        self.pni.get_plan_of_neem(5)
+        performers = self.pni.get_and_spawn_performers()
+        self.assertIsInstance(performers, dict)
+        self.assertIsInstance(list(performers.values())[0], Object)
 
     def test_get_neem_ids(self):
         neem_ids = self.pni.get_neem_ids()

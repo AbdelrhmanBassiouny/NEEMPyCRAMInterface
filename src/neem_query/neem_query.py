@@ -18,6 +18,7 @@ class NeemQuery:
     """
     engine: Engine
     session: Session
+    neem_data_link: Optional[str] = "https://neem-data.informatik.uni-bremen.de/data"
 
     def __init__(self, sql_uri: str):
         self.engine = create_engine(sql_uri)
@@ -582,6 +583,65 @@ class NeemQuery:
         """
         return self.join_type(AgentType, Agent, Agent.dul_Entity_o, is_outer=is_outer)
 
+    def join_is_performed_by(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the is performed by table. Assumes DulExecutesTask has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {SomaIsPerformedBy: and_(SomaIsPerformedBy.dul_Action_s == DulExecutesTask.dul_Action_s,
+                                         SomaIsPerformedBy.neem_id == DulExecutesTask.neem_id)}
+        outer_join = {SomaIsPerformedBy: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_object_mesh_path(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the object mesh path table. Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_object_shape(is_outer=is_outer).
+         join_shape_mesh(is_outer=is_outer).
+         join_mesh_path(is_outer=is_outer))
+        return self
+
+    def join_object_shape(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the object shape table. Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {SomaHasShape: and_(SomaHasShape.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                                    SomaHasShape.neem_id == DulHasParticipant.neem_id)}
+        outer_join = {SomaHasShape: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_shape_mesh(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the shape mesh table. Assumes SomaHasShape has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {DulHasRegion: and_(DulHasRegion.dul_Entity_s == SomaHasShape.soma_Shape_o,
+                                    DulHasRegion.neem_id == SomaHasShape.neem_id)}
+        outer_join = {DulHasRegion: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_mesh_path(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the mesh path table. Assumes DulHasRegion has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {SomaHasFilePath: and_(SomaHasFilePath.dul_Entity_s == DulHasRegion.dul_Region_o,
+                                       SomaHasFilePath.neem_id == DulHasRegion.neem_id)}
+        outer_join = {SomaHasFilePath: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
     def join_type(self, type_table: Table, type_of_table: Table, type_of_column: Column,
                   is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -789,6 +849,30 @@ class NeemQuery:
         self.select_type(AgentType)
         return self
 
+    def select_is_performed_by(self) -> 'NeemQuery':
+        """
+        Select is performed by column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([SomaIsPerformedBy.dul_Agent_o])
+        return self
+
+    def select_sql_neem_id(self) -> 'NeemQuery':
+        """
+        Select the neem_id column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([Neem.ID])
+        return self
+
+    def select_object_mesh_path(self) -> 'NeemQuery':
+        """
+        Select object mesh path column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([SomaHasFilePath.o])
+        return self
+
     def order_by_stamp(self) -> 'NeemQuery':
         """
         Order the query results by the tf header stamp column.
@@ -838,7 +922,7 @@ class NeemQuery:
         :param table: the table.
         :return: True if the table exists, False otherwise.
         """
-        return table in self.joins or [col in self.selected_columns for col in table.ID.table.columns]
+        return table in self.joins or [col in self.selected_columns for col in table.__table_.columns]
 
     def _update_joins_metadata(self, joins: Dict[Table, BinaryExpression],
                                in_filters: Optional[Dict[Column, List]] = None,

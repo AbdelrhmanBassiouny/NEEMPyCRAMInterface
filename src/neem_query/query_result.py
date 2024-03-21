@@ -387,6 +387,22 @@ class QueryResult:
         """
         return self.filter_by_participant(agent).get_tasks(unique)
 
+    def get_task_is_performed_by(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the task performers in the query result DataFrame.
+        :param unique: whether to return unique task performers or not.
+        :return: the task performers in the NEEM.
+        """
+        return self.get_column_values(CL.is_performed_by.value, unique)
+
+    def get_object_mesh_path(self, unique: Optional[bool] = False) -> List[str]:
+        """
+        Get the object mesh path in the query result DataFrame.
+        :param unique: whether to return unique object mesh path or not.
+        :return: the object mesh path in the NEEM.
+        """
+        return self.get_column_values(CL.object_mesh_path.value, unique)
+
     def get_column_values(self, column: str, unique: Optional[bool] = False) -> List[Any]:
         """
         Get a column from the query result DataFrame.
