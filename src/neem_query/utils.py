@@ -90,8 +90,8 @@ class RepositorySearch:
         self.repository_url = repository_url
         self.timeout = timeout
         self.max_tries = 3
-        self.all_file_links = []
-        self.all_file_names = []
+        self.all_file_links = set()
+        self.all_file_names = set()
         if start_search_in is not None:
             self.stack.extend(start_search_in)
 
@@ -110,8 +110,8 @@ class RepositorySearch:
             soup = BeautifulSoup(response.content, 'html.parser')
             links = [urljoin(page_url, link['href']) for link in soup.find_all('a', href=True)]
             links = [link for link in links if link.startswith(page_url) and link != page_url]
-            self.all_file_links.extend(links)
-            self.all_file_names.extend([link.split('/')[-1] for link in links])  # Extract file names
+            self.all_file_links.update(links)  # Add links to the set
+            self.all_file_names.update([link.split('/')[-1] for link in links])  # Extract file names
             return links
         else:
             logging.error(f"Failed to fetch content from {page_url}. Status code: {response.status_code}")
@@ -163,7 +163,7 @@ class RepositorySearch:
                 similar_files_in_folder.append(link)
         return similar_files_in_folder
 
-    def search_similar_file_names(self, search_query: str, find_all: Optional[bool] = True) -> List[str]:
+    def search_similar_file_names(self, search_query: List[str], find_all: Optional[bool] = True) -> List[str]:
         """
         Search for similar file names within the repository.
 
@@ -174,32 +174,22 @@ class RepositorySearch:
         Returns:
         - list of str: List of similar file names found within the repository.
         """
-        # Check if the search query matches any of the cached file names
-        cached_matches = [file_link for file_link, file_name in zip(self.all_file_links, self.all_file_names) if
-                          search_query.lower() in file_name.lower()]
+        stack = self.stack + [self.repository_url]
+        similar_files = []
 
-        if cached_matches:
-            return cached_matches
-        else:
-            # If no matches found in cached file names, search through the repository
-            # return self.search_in_folder(self.repository_url, search_query)
-            # If no matches found in cached file names, search through the repository
-            stack = self.stack + [self.repository_url]
-            similar_files = []
+        while stack:
+            folder_url = stack.pop()
+            folder_links = self.get_links_from_page(folder_url)
+            for link in folder_links:
+                if any(folder in link for folder in self.skip_folders):
+                    continue
+                if link.endswith('/'):
+                    stack.append(link)
+                else:
+                    if any(query.lower() in link.lower() for query in search_query):
+                        similar_files.append(link)
+                        if not find_all:
+                            return similar_files
 
-            while stack:
-                folder_url = stack.pop()
-                folder_links = self.get_links_from_page(folder_url)
-                for link in folder_links:
-                    if any(folder in link for folder in self.skip_folders):
-                        continue
-                    if link.endswith('/'):
-                        stack.append(link)
-                    else:
-                        if search_query.lower() in link.lower():
-                            similar_files.append(link)
-                            if not find_all:
-                                return similar_files
-
-            return similar_files
+        return similar_files
 

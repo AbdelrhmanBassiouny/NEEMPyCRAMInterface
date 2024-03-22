@@ -1,7 +1,6 @@
 import logging
 import os
 import shutil
-import tempfile
 import time
 from dataclasses import dataclass
 from urllib import request
@@ -11,35 +10,14 @@ from pycram.datastructures.enums import ObjectType
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
 from pycram.world_concepts.world_object import Object
-from typing_extensions import Optional, Dict, Tuple, List, Callable
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
 from pycram.world import World
 
 from .neem_interface import NeemInterface
 from .query_result import QueryResult
-from .utils import ModuleInspector
+from .utils import ModuleInspector, RepositorySearch
 from .enums import ColumnLabel as CL
 
-
-World.add_resource_path('/tmp')
-action_designator_inspector = ModuleInspector(action_designator.__name__)
-pycram_actions = action_designator_inspector.get_all_classes_dict()
-
-soma_to_pycram = {'soma:Grasping': pycram_actions['GraspingAction'],
-                  'soma:PositioningArm': pycram_actions['ParkArmsAction'],
-                  'soma:SettingGripper': pycram_actions['SetGripperAction'],
-                  'soma:LookingAt': pycram_actions['LookAtAction'],
-                  'soma:Releasing': pycram_actions['ReleaseAction'],
-                  'soma:PickingUp': pycram_actions['PickUpAction'],
-                  'soma:Placing': pycram_actions['PlaceAction'],
-                  'soma:Gripping': pycram_actions['GripAction'],
-                  'soma:Closing': pycram_actions['CloseAction'],
-                  'soma:Opening': pycram_actions['OpenAction'],
-                  'soma:OpeningGripper': pycram_actions['SetGripperAction'],
-                  'soma:Navigating': pycram_actions['NavigateAction'],
-                  'soma:Delivering': pycram_actions['TransportAction'],
-                  'soma:Detecting': pycram_actions['DetectAction'],
-                  'soma:AssumingArmPose:': pycram_actions['ParkArmsAction'],
-                  }
 
 @dataclass
 class ReplayNEEMMotionData:
@@ -56,6 +34,28 @@ class PyCRAMNEEMInterface(NeemInterface):
     """
     A class to interface with the NEEM database and PyCRAM.
     """
+    data_dirs: Optional[List[str]] = [os.path.join(os.path.dirname(__file__), '..', '..', 'resources'), '/tmp']
+    for data_dir in data_dirs:
+        World.add_resource_path(data_dir)
+
+    action_designator_inspector = ModuleInspector(action_designator.__name__)
+    pycram_actions = action_designator_inspector.get_all_classes_dict()
+    soma_to_pycram = {'soma:Grasping': pycram_actions['GraspingAction'],
+                      'soma:PositioningArm': pycram_actions['ParkArmsAction'],
+                      'soma:SettingGripper': pycram_actions['SetGripperAction'],
+                      'soma:LookingAt': pycram_actions['LookAtAction'],
+                      'soma:Releasing': pycram_actions['ReleaseAction'],
+                      'soma:PickingUp': pycram_actions['PickUpAction'],
+                      'soma:Placing': pycram_actions['PlaceAction'],
+                      'soma:Gripping': pycram_actions['GripAction'],
+                      'soma:Closing': pycram_actions['CloseAction'],
+                      'soma:Opening': pycram_actions['OpenAction'],
+                      'soma:OpeningGripper': pycram_actions['SetGripperAction'],
+                      'soma:Navigating': pycram_actions['NavigateAction'],
+                      'soma:Delivering': pycram_actions['TransportAction'],
+                      'soma:Detecting': pycram_actions['DetectAction'],
+                      'soma:AssumingArmPose:': pycram_actions['ParkArmsAction'],
+                      }
 
     def __init__(self, db_url: str):
         """
@@ -63,6 +63,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param db_url: the URL to the NEEM database.
         """
         super().__init__(db_url)
+        self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
 
     def redo_neem_plan(self):
         """
@@ -80,8 +81,8 @@ class PyCRAMNEEMInterface(NeemInterface):
                                                                         self.get_stamp()):
             # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
             # TODO: Create designators for objects.
-            if task in soma_to_pycram:
-                action = soma_to_pycram[task]
+            if task in self.soma_to_pycram:
+                action = self.soma_to_pycram[task]
                 action_description = action(parameters)
                 action_description.ground()
                 action_description.resolve()
@@ -213,18 +214,43 @@ class PyCRAMNEEMInterface(NeemInterface):
             logging.debug(f'No description found for agent {agent}')
             raise ValueError(f'No description found for agent {agent}')
 
-    def get_description_of_participant(self, neem_id: str, participant: str) -> str:
+    def get_and_download_mesh_of_participant(self, participant: str, neem_id: str) -> Union[str, None]:
         """
-        Get the description of a participant.
+        Get the mesh of a participant and download it.
+        :param participant: the participant to get the mesh of.
         :param neem_id: the id of the NEEM.
-        :param participant: the participant to get the description of.
-        :return: the description of the participant.
+        :return: the download path of the mesh file.
         """
         mesh_link = self.get_mesh_link_of_object_in_neem(neem_id, participant)
         if mesh_link is not None:
             download_path = self.download_mesh_file(mesh_link)
             if download_path is not None:
                 return download_path
+
+    def get_description_of_participant(self, neem_id: str, participant: str) -> Union[str, None]:
+        """
+        Get the description of a participant.
+        :param neem_id: the id of the NEEM.
+        :param participant: the participant to get the description of.
+        :return: the description of the participant.
+        """
+        participant_name_candidates = self._filter_participant_name(participant)
+
+        if 'NIL' in participant_name_candidates:
+            return None
+
+        file_path = self._find_file_in_data_dir(participant_name_candidates)
+        if file_path is not None:
+            return file_path
+
+        download_path = self.get_and_download_mesh_of_participant(participant, neem_id)
+        if download_path is not None:
+            return download_path
+
+        download_path = self._search_for_participant_in_online_repository(participant_name_candidates)
+        if download_path is not None:
+            return download_path
+
         if 'cup' in participant.lower():
             return 'jeroen_cup.stl'
         elif 'bowl' in participant.lower() or 'pot' in participant.lower():
@@ -243,7 +269,80 @@ class PyCRAMNEEMInterface(NeemInterface):
             logging.error(f'No description found for participant {participant}')
             raise ValueError(f'No description found for participant {participant}')
 
-    def get_mesh_link_of_object_in_neem(self, neem_id: str, object_name: str) -> str:
+    def _find_file_in_data_dir(self, file_name: List[str]) -> Union[str, None]:
+        """
+        Find a file in the data directories.
+        :param file_name: the file to find.
+        :return: the path of the file in the data directories.
+        """
+        for data_dir in self.data_dirs:
+            for file in os.listdir(data_dir):
+                for name in file_name:
+                    if name in file:
+                        return os.path.join(data_dir, file)
+
+    def _filter_participant_name(self, participant: str) -> List[str]:
+        """
+        Filter the participant name.
+        :param participant: the participant to filter.
+        :return: the filtered participant name candidates.
+        """
+
+        participant_name_candidates = []
+        participant_name = participant.split(':')[-1]
+
+        while participant_name[-1].isdigit():
+            participant_name = participant_name[:-1]
+
+        participant_name = participant_name.strip(' _-')
+
+        participant_name = participant_name.split('_')
+        if len(participant_name) > 2:
+            participant_name = '_'.join(participant_name[:-1])
+        else:
+            participant_name = '_'.join(participant_name)
+        # if it ends with a number, remove the number
+        while participant_name[-1].isdigit():
+            participant_name = participant_name[:-1]
+
+        participant_name_candidates.append(participant_name)
+        if '_' in participant_name:
+            participant_name_candidates.append(self._make_camel_case(participant_name))
+
+        return participant_name_candidates
+
+    @staticmethod
+    def _make_camel_case(participant_name: str) -> str:
+        """
+        Make the participant name camel case.
+        :param participant_name: the participant name to make camel case.
+        :return: the participant name in camel case.
+        """
+        participant_name = participant_name.split('_')
+        participant_name = [part.capitalize() for part in participant_name]
+        return ''.join(participant_name)
+
+    def get_all_files_in_resources(self) -> List[str]:
+        """
+        Get all the files in the data directories.
+        """
+        files = []
+        for data_dir in self.data_dirs:
+            files.extend(os.listdir(data_dir))
+        return files
+
+    def _search_for_participant_in_online_repository(self, participant_names: List[str]) -> Union[str, None]:
+        """
+        Search for a participant in the online repository.
+        :param participant_names: the participants to search for.
+        :return: the download path of the participant mesh file.
+        """
+        file_names = self.mesh_repo_search.search_similar_file_names(participant_names, find_all=False)
+        if len(file_names) > 0:
+            download_path = self.download_mesh_file(file_names[0])
+            return download_path
+
+    def get_mesh_link_of_object_in_neem(self, neem_id: str, object_name: str) -> Union[str, None]:
         """
         Get the mesh link of an object in a NEEM.
         :param neem_id: The id of the NEEM.
@@ -254,7 +353,10 @@ class PyCRAMNEEMInterface(NeemInterface):
         mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
         if mesh_path is None:
             return None
-        mesh_link = mesh_path.replace('package:/', self.neem_data_link)
+        if 'package:/' in mesh_path:
+            mesh_link = mesh_path.replace('package:/', self.neem_data_link)
+        else:
+            mesh_link = mesh_path
         return mesh_link
 
     @staticmethod
@@ -266,7 +368,6 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         file_name = mesh_link.split('/')[-1]
         download_path = os.path.join('/tmp', file_name)
-        print(mesh_link)
         with request.urlopen(mesh_link, timeout=1) as response:
             with open(download_path, 'wb') as file:
                 shutil.copyfileobj(response, file)
