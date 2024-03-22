@@ -18,8 +18,8 @@ class TestUtils(TestCase):
         self.assertTrue(all(isinstance(link, str) for link in links))
 
     def test_search_similar_file_names(self):
-        query = 'milk.dae'
-        file_names = self.sr.search_similar_file_names(query, find_all=False)
+        query = 'cup'
+        file_names = self.sr.search_similar_file_names([query], find_all=False)
         self.assertTrue(len(self.sr.all_file_names) > 0)
         self.assertTrue(len(self.sr.all_file_links) > 0)
         self.assertTrue(all(isinstance(name, str) for name in self.sr.all_file_names))
