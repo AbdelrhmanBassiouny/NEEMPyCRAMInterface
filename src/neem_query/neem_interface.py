@@ -111,24 +111,26 @@ class NeemInterface(NeemQuery):
         self.get_neems_motion_replay_data().filter_by_task_type(task, regexp)
         return self
 
-    def get_neems_motion_replay_data(self, participant_necessary: Optional[bool] = True) -> NeemQuery:
+    def get_neems_motion_replay_data(self, participant_necessary: Optional[bool] = False) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
         :return: the query.
         """
         self.reset()
-        (self.select_participant().select_participant_type().
-         select_tf_columns().select_tf_transform_columns().
+        (self.select_participant().select_participant_type().select_object_mesh_path().
+         # select_tf_columns().select_tf_transform_columns().
          select(Neem._id).
          select_environment().
          select_from_tasks().
          join_task_types().
          join_all_task_participants_data(is_outer=not participant_necessary).
-         join_participant_base_link().
-         join_task_time_interval().
-         join_tf_on_time_interval().filter_tf_by_base_link().
-         join_tf_transfrom().
-         join_neems().join_neems_environment()
-         .order_by_stamp())
+         # join_participant_base_link().
+         # join_task_time_interval().
+         # join_tf_on_time_interval().filter_tf_by_base_link().
+         # join_tf_transfrom().
+         join_neems().join_neems_environment().
+         join_object_mesh_path(is_outer=True)
+         # .order_by_stamp()
+         )
         return self

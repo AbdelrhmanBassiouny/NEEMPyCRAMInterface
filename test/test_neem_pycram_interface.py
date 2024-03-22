@@ -24,11 +24,10 @@ class TestNeemPycramInterface(TestCase):
     @classmethod
     def setUpClass(cls):
         cls.pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.neem_qr = (cls.pni.get_task_data_from_all_neems('Pour', regexp=True).
-                       filter_by_participant_type('soma:DesignedContainer').join_object_mesh_path().
-                       select_object_mesh_path().
-                       limit(100).get_result())
-        cls.neem_qr = cls.pni.get_plan_of_neem(5).select_participant().get_result()
+        cls.neem_qr = (cls.pni.get_neems_motion_replay_data().get_result())
+        print(cls.neem_qr.get_participants(unique=True))
+        print(cls.neem_qr.get_object_mesh_path(unique=True))
+        # cls.neem_qr = cls.pni.get_plan_of_neem(7).select_participant().get_result()
         cls.world = BulletWorld(mode=WorldMode.DIRECT)
         cls.vis_mark_publisher = VizMarkerPublisher()
 
@@ -40,8 +39,7 @@ class TestNeemPycramInterface(TestCase):
     def tearDown(self):
         self.pni.reset()
         self.neem_qr = (self.pni.get_task_data_from_all_neems('Pour', regexp=True).
-                        filter_by_participant_type('soma:DesignedContainer').join_object_mesh_path().
-                        select_object_mesh_path().
+                        filter_by_participant_type('soma:DesignedContainer').
                         limit(100).get_result())
 
     def test_get_and_spawn_environment(self):

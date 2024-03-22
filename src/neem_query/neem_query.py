@@ -18,7 +18,10 @@ class NeemQuery:
     """
     engine: Engine
     session: Session
-    neem_data_link: Optional[str] = "https://neem-data.informatik.uni-bremen.de/data"
+    neem_data_link: Optional[str] = "https://neem-data.informatik.uni-bremen.de/data/"
+    mesh_folders: Optional[List[str]] = ['pouring_hands_neem/meshes/',
+                                         'kitchen_object_meshes/',
+                                         'bielefeld_study_neem/meshes/']
 
     def __init__(self, sql_uri: str):
         self.engine = create_engine(sql_uri)
@@ -36,6 +39,13 @@ class NeemQuery:
         self.latest_executed_query: Optional[Select] = None
         self.latest_result: Optional[QueryResult] = None
         self._distinct = False
+
+    @classmethod
+    def _get_mesh_links(cls):
+        """
+        Get the mesh links of the objects.
+        """
+        return [cls.neem_data_link + folder for folder in cls.mesh_folders]
 
     def get_task(self, task: str) -> DulExecutesTask:
         """

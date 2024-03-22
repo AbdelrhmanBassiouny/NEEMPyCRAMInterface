@@ -1,7 +1,10 @@
 import logging
 import os
+import shutil
+import tempfile
 import time
-from dataclasses import dataclass, astuple
+from dataclasses import dataclass
+from urllib import request
 
 import rospy
 from pycram.datastructures.enums import ObjectType
@@ -9,6 +12,7 @@ from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
 from pycram.world_concepts.world_object import Object
 from typing_extensions import Optional, Dict, Tuple, List, Callable
+from pycram.world import World
 
 from .neem_interface import NeemInterface
 from .query_result import QueryResult
@@ -16,6 +20,7 @@ from .utils import ModuleInspector
 from .enums import ColumnLabel as CL
 
 
+World.add_resource_path('/tmp')
 action_designator_inspector = ModuleInspector(action_designator.__name__)
 pycram_actions = action_designator_inspector.get_all_classes_dict()
 
@@ -174,6 +179,8 @@ class PyCRAMNEEMInterface(NeemInterface):
                 logging.warning(f'Error getting description for entity {neem_entity}: {e}')
                 continue
             neem_entity_name = neem_entity
+            if ':' in neem_entity_name:
+                neem_entity_name = neem_entity_name.split(':')[-1]
             if neem_entity in neem_entities:
                 neem_entity_name = f'{neem_entity}_{neem}'
             entity_object = Object(neem_entity_name, object_type_getter(neem_entity), description)
@@ -259,7 +266,10 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         file_name = mesh_link.split('/')[-1]
         download_path = os.path.join('/tmp', file_name)
-        os.system(f'wget {mesh_link} -O {download_path}')
+        print(mesh_link)
+        with request.urlopen(mesh_link, timeout=1) as response:
+            with open(download_path, 'wb') as file:
+                shutil.copyfileobj(response, file)
         return download_path
 
     @staticmethod
