@@ -265,6 +265,8 @@ class PyCRAMNEEMInterface(NeemInterface):
             return 'cereal.stl'
         elif 'spoon' in participant.lower():
             return 'spoon.stl'
+        elif 'plate' in participant.lower():
+            return 'bowl.stl'
         else:
             logging.error(f'No description found for participant {participant}')
             raise ValueError(f'No description found for participant {participant}')
