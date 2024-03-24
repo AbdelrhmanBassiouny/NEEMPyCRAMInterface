@@ -309,7 +309,10 @@ class PyCRAMNEEMInterface(NeemInterface):
 
         participant_name_candidates.append(participant_name)
         if '_' in participant_name:
-            participant_name_candidates.append(self._make_camel_case(participant_name))
+            if participant_name[0].islower():
+                participant_name_candidates.append(self._make_camel_case(participant_name))
+            else:
+                participant_name_candidates.append(''.join(participant_name.split('_')))
 
         return participant_name_candidates
 
@@ -352,6 +355,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: The mesh link of the object.
         """
         mesh_path_df = self.query_result.filter_by_participant(object_name).filter_by_neem_id(neem_id).df
+        mesh_path_df = mesh_path_df.dropna(subset=[CL.object_mesh_path.value]).drop_duplicates()
         mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
         if mesh_path is None:
             return None

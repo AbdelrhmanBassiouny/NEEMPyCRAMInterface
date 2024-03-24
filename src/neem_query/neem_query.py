@@ -2,7 +2,7 @@ import logging
 
 import pandas as pd
 from sqlalchemy import (create_engine, Engine, between, and_, func, Table, BinaryExpression, select,
-                        Select, not_)
+                        Select, not_, or_)
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from typing_extensions import Optional, List, Dict
 
@@ -440,7 +440,7 @@ class NeemQuery:
         :param is_outer: whether to use outer join or not.
         """
         joins = {Tf: and_(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
-                          Tf.neem_id == UrdfHasBaseLink.neem_id),
+                          Tf.neem_id == DulHasParticipant.neem_id),
                  TfHeader: Tf.header == TfHeader.ID}
         outer_join = {Tf: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
@@ -464,6 +464,14 @@ class NeemQuery:
         :return: the modified query.
         """
         return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
+
+    def filter_tf_by_base_link_or_participant(self) -> 'NeemQuery':
+        """
+        Filter the tf data by base link or participant. Assumes UrdfHasBaseLink and DulHasParticipant have been joined/selected already.
+        :return: the modified query.
+        """
+        return self.filter(or_(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
+                               Tf.child_frame_id == func.substring_index(DulHasParticipant.dul_Object_o, ':', -1)))
 
     def join_neems(self, on: Optional[BinaryExpression] = None) -> 'NeemQuery':
         """
