@@ -81,7 +81,7 @@ class NeemInterface(NeemQuery):
         :return: The task tree of a single neem as a neem query.
         """
         # noinspection PyTypeChecker
-        self.get_task_sequence().join_neems().filter_by_neem_id(neem_id)
+        self.get_task_sequence().join_neems().filter_by_sql_neem_id(neem_id)
         return self
 
     def get_task_sequence(self) -> NeemQuery:

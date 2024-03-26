@@ -1057,13 +1057,23 @@ class NeemQuery:
         self.filters.append(cond)
         return self
 
-    def filter_by_neem_id(self, neem_id: int) -> 'NeemQuery':
+    def filter_by_sql_neem_id(self, neem_id: int) -> 'NeemQuery':
         """
         Filter the query by neem_id.
         :param neem_id: the neem_id.
         :return: the modified query.
         """
         self.filters.append(Neem.ID == neem_id)
+        return self
+
+    def filter_by_neem_id(self, neem_id: str) -> 'NeemQuery':
+        """
+        Filter the query by neem_id.
+        :param neem_id: the neem_id.
+        :return: the modified query.
+        """
+        neem_id_col = self.find_neem_id()
+        self.filters.append(neem_id_col == neem_id)
         return self
 
     def filter(self, *filters: BinaryExpression) -> 'NeemQuery':

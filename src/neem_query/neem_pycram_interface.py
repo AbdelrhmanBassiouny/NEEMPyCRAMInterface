@@ -6,17 +6,20 @@ from dataclasses import dataclass
 from urllib import request
 
 import rospy
-from pycram.datastructures.enums import ObjectType
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
+
+from designators.action_designator import PickUpAction
+from designators.object_designator import BelieveObject
+from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
-from pycram.world_concepts.world_object import Object
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
 from pycram.world import World
-
+from pycram.world_concepts.world_object import Object
+from .enums import ColumnLabel as CL
 from .neem_interface import NeemInterface
+from .neem_query import NeemQuery
 from .query_result import QueryResult
 from .utils import ModuleInspector, RepositorySearch
-from .enums import ColumnLabel as CL
 
 
 @dataclass
@@ -28,6 +31,25 @@ class ReplayNEEMMotionData:
     times: List[float]
     participant_instances: List[str]
     neem_ids: List[str]
+
+
+@dataclass
+class NEEMObjectMetadata:
+    """
+    A data class to holds a NEEM object's metadata.
+    """
+    neem_id: str
+    object_name: str
+
+
+@dataclass
+class NEEMObjects:
+    """
+    A data class to hold the pycram objects in the NEEM.
+    """
+    environment: Object
+    participants: Dict[NEEMObjectMetadata, Object]
+    performers: Dict[NEEMObjectMetadata, Object]
 
 
 class PyCRAMNEEMInterface(NeemInterface):
@@ -77,7 +99,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         for neem_id, participant, task, parameters, current_time in zip(self.get_neem_ids(unique=False),
                                                                         self.get_participants(unique=False),
                                                                         tasks,
-                                                                        self.query_result.get_column_value_per_neem(CL.task_parameter.value),
+                                                                        self.query_result.get_column_value_per_neem(
+                                                                            CL.task_parameter.value),
                                                                         self.get_stamp()):
             # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
             # TODO: Create designators for objects.
@@ -89,6 +112,56 @@ class PyCRAMNEEMInterface(NeemInterface):
                 action_description.perform()
             else:
                 logging.warning(f'No action found for task {task}')
+
+    def redo_pick_action_for_neem(self, neem_id: str):
+        """
+        Redo pick actions from neem(s) using PyCRAM.
+        The query should contain:
+         neem_id, action, participant, performed_by.
+        """
+        self.query_pick_actions(neem_id)
+        neem_objects = self.get_and_spawn_neem_objects()
+        environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects()
+        grasps = [g.name.lower() for g in Grasp]
+        arms = [arm.name.lower() for arm in Arms]
+        PickUpAction(participant_desig, arms, grasps).resolve().perform()
+
+    def get_and_spawn_neem_objects(self) -> NEEMObjects:
+        """
+        Get and spawn the objects in the NEEM using PyCRAM.
+        """
+        environment_obj = self.get_and_spawn_environment()
+        participant_objects = self.get_and_spawn_participants()
+        performer_objects = self.get_and_spawn_performers()
+        return NEEMObjects(environment_obj, participant_objects, performer_objects)
+
+    def get_designators_for_neem_objects(self) -> \
+            Tuple[BelieveObject, Dict[NEEMObjectMetadata, BelieveObject], Dict[NEEMObjectMetadata, BelieveObject]]:
+        """
+        Get the designators for the objects in the NEEM.
+        """
+        neem_objects = self.get_and_spawn_neem_objects()
+        environment_desig = BelieveObject(names=[neem_objects.environment.name])
+        participant_desigs = {metadata: BelieveObject(names=[object_.name])
+                              for metadata, object_ in neem_objects.participants.items()}
+        performer_desigs = {metadata: BelieveObject(names=[object_.name])
+                            for metadata, object_ in neem_objects.performers.items()}
+        return environment_desig, participant_desigs, performer_desigs
+
+    def query_pick_actions(self, neem_id: Optional[str] = None) -> NeemQuery:
+        """
+        Get the query to redo pick actions from neem(s) using PyCRAM.
+        The query should contain:
+         neem_id, action, participant, performed_by.
+        :param neem_id: the id of the NEEM, if None, all NEEMs are considered.
+        """
+        (self.select_neem_id().select_participant().select_participant_type().select_from_tasks()
+         .join_task_types()
+         .join_task_participants().join_participant_types()
+         .filter_by_task_type('soma:PickingUp'))
+        if neem_id is not None:
+            self.filter_by_sql_neem_id(neem_id)
+        return self
 
     def replay_neem_motions(self):
         """
@@ -113,7 +186,7 @@ class PyCRAMNEEMInterface(NeemInterface):
                     wait_time = 1
                 time.sleep(wait_time)
             prev_time = current_time
-            participant_objects[(neem_id, participant)].set_pose(pose)
+            participant_objects[NEEMObjectMetadata(neem_id, participant)].set_pose(pose)
 
     def get_motion_data(self):
         """
@@ -125,7 +198,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         neem_ids = self.get_neem_ids(unique=False)
         return ReplayNEEMMotionData(poses, times, participant_instances, neem_ids)
 
-    def get_and_spawn_environment_and_participants(self):
+    def get_and_spawn_environment_and_participants(self) -> Tuple[Object, Dict[NEEMObjectMetadata, Object]]:
         """
         Get and spawn the environment and participants in the NEEM using PyCRAM.
         """
@@ -142,7 +215,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
 
-    def get_and_spawn_performers(self) -> Dict[Tuple[str, str], Object]:
+    def get_and_spawn_performers(self) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the agents in the NEEM using PyCRAM.
         :return: the agents as a dictionary of PyCRAM objects.
@@ -151,7 +224,7 @@ class PyCRAMNEEMInterface(NeemInterface):
                                            self.get_description_of_performer,
                                            lambda _: ObjectType.ROBOT)
 
-    def get_and_spawn_participants(self) -> Dict[Tuple[str, str], Object]:
+    def get_and_spawn_participants(self) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the participants in the NEEM using PyCRAM.
         :return: the participants as a dictionary of PyCRAM objects.
@@ -162,7 +235,7 @@ class PyCRAMNEEMInterface(NeemInterface):
 
     def get_and_spawn_entities(self, entity_column_name: str,
                                description_getter: Callable[[str, str], str],
-                               object_type_getter: Callable[[str], ObjectType]) -> Dict[Tuple[str, str], Object]:
+                               object_type_getter: Callable[[str], ObjectType]) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
         :param entity_column_name: the entity to get and spawn.
@@ -185,7 +258,7 @@ class PyCRAMNEEMInterface(NeemInterface):
             if neem_entity in neem_entities:
                 neem_entity_name = f'{neem_entity}_{neem}'
             entity_object = Object(neem_entity_name, object_type_getter(neem_entity), description)
-            entity_objects[(neem, neem_entity)] = entity_object
+            entity_objects[NEEMObjectMetadata(neem, neem_entity)] = entity_object
             neem_entities.append(neem_entity)
         return entity_objects
 

@@ -60,7 +60,7 @@ class TestNeemInterface(TestCase):
                select_neem_id().
                select_from_tasks().
                join_task_types().
-               join_neems().filter_by_neem_id(neem_id).
+               join_neems().filter_by_sql_neem_id(neem_id).
                join_task_time_interval().
                order_by_interval_begin()).get_result().df
 

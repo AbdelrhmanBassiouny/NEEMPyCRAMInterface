@@ -102,3 +102,7 @@ class TestNeemSqlAlchemy(TestCase):
         df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
               join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value:5}).df
         self.assertTrue(len(df) > 0)
+
+    def test_get_unique_task_types(self):
+        df = self.nq.select_task_type().select_from_tasks().join_task_types().distinct().get_result().df
+        print(df)
