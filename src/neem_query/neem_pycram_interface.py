@@ -175,7 +175,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         neem_entities = []
         for neem, neem_entity in entities:
             try:
-                description = description_getter(neem, neem_entity)
+                description = description_getter(neem_entity, neem)
             except ValueError as e:
                 logging.warning(f'Error getting description for entity {neem_entity}: {e}')
                 continue
@@ -190,10 +190,11 @@ class PyCRAMNEEMInterface(NeemInterface):
         return entity_objects
 
     @staticmethod
-    def get_description_of_performer(agent: str) -> str:
+    def get_description_of_performer(agent: str, neem_id: Optional[str] = None) -> str:
         """
         Get the description of an agent.
         :param agent: the agent to get the description of.
+        :param neem_id: the id of the NEEM.
         :return: the description of the agent.
         """
         if 'pr2' in agent.lower():
@@ -227,11 +228,11 @@ class PyCRAMNEEMInterface(NeemInterface):
             if download_path is not None:
                 return download_path
 
-    def get_description_of_participant(self, neem_id: str, participant: str) -> Union[str, None]:
+    def get_description_of_participant(self, participant: str, neem_id: str) -> Union[str, None]:
         """
         Get the description of a participant.
-        :param neem_id: the id of the NEEM.
         :param participant: the participant to get the description of.
+        :param neem_id: the id of the NEEM.
         :return: the description of the participant.
         """
         participant_name_candidates = self._filter_participant_name(participant)
