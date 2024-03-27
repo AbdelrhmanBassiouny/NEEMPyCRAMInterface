@@ -1,6 +1,6 @@
 import pandas as pd
 from sqlalchemy import Engine, text
-from typing_extensions import Optional
+from typing_extensions import Optional, List
 
 from .neem_query import NeemQuery
 from .neems_database import *
@@ -52,39 +52,39 @@ class NeemInterface(NeemQuery):
         """
         super().__init__(sql_url)
 
-    def get_plan_of_neem(self, neem_id: int) -> NeemQuery:
+    def query_plan_of_neem(self, neem_id: int) -> NeemQuery:
         """
         Get the complete cram plan of a neem given the neem ID.
         :param neem_id: The id in (ID) column of the Neems table.
         :return: The plan as a neem query.
         """
         # noinspection PyTypeChecker
-        self.get_all_plans().join_neems().filter(Neem.ID == neem_id)
+        self.query_plans().join_neems().filter(Neem.ID == neem_id)
         return self
 
-    def get_all_plans(self) -> NeemQuery:
+    def query_plans(self) -> NeemQuery:
         """
         Get all the plans in the database.
         :return: The plans as a neem query.
         """
-        (self.get_task_sequence().select_subtask_type().select_participant_type().select_parameter_type().
+        (self.query_task_sequence().select_subtask_type().select_participant_type().select_parameter_type().
          select_is_performed_by().select_object_mesh_path().
          join_all_subtasks_data(is_outer=True).
          join_all_task_participants_data(is_outer=True).
          join_all_task_parameter_data(is_outer=True).join_is_performed_by().join_object_mesh_path(is_outer=True))
         return self
 
-    def get_task_sequence_of_neem(self, neem_id: int) -> NeemQuery:
+    def query_task_sequence_of_neem(self, neem_id: int) -> NeemQuery:
         """
         Get the task tree of a plan of a certain neem.
         :param neem_id: The id in (ID) column of the Neems table.
         :return: The task tree of a single neem as a neem query.
         """
         # noinspection PyTypeChecker
-        self.get_task_sequence().join_neems().filter_by_sql_neem_id(neem_id)
+        self.query_task_sequence().join_neems().filter_by_sql_neem_id(neem_id)
         return self
 
-    def get_task_sequence(self) -> NeemQuery:
+    def query_task_sequence(self) -> NeemQuery:
         """
         Get the task tree of all the plans in the database.
         :return: The task tree as a neem query.
@@ -100,18 +100,42 @@ class NeemInterface(NeemQuery):
          order_by_interval_begin())
         return self
 
-    def get_task_data_from_all_neems(self, task: str,
-                                     regexp: Optional[bool] = False) -> NeemQuery:
+    def query_task_data(self, tasks: List[str],
+                        regexp: Optional[bool] = False) -> NeemQuery:
         """
         Get the data of a certain task from all the NEEMs.
-        :param task: the task name.
+        :param tasks: the task names.
         :param regexp: whether to use regular expressions or not.
         :return: the query.
         """
-        self.get_neems_motion_replay_data().filter_by_task_type(task, regexp)
+        self.query_neems_motion_replay_data().filter_by_task_types(tasks, regexp)
         return self
 
-    def get_neems_motion_replay_data(self, participant_necessary: Optional[bool] = False) -> NeemQuery:
+    def query_tasks_semantic_data(self, tasks: List[str], outer_join_task_parameters: Optional[bool] = True,
+                                  regexp: Optional[bool] = True) -> NeemQuery:
+        """
+        Get the data of a certain task from all the NEEMs.
+        :param tasks: the task names.
+        :param outer_join_task_parameters: whether to use outer join for the task parameters or not.
+        :param regexp: whether to use regular expressions or not.
+        :return: the query.
+        """
+        self.reset()
+        (self.select_task_type().select_participant().select_participant_type().select_environment().
+         select_is_performed_by().select_is_performed_by_type().select_parameter_type().select_sql_neem_id().
+         select_from_tasks().
+         join_task_types().filter_by_task_types(tasks, regexp=regexp).
+         join_task_participants(is_outer=True).
+         join_participant_types(is_outer=True).
+         join_is_performed_by().join_is_performed_by_type().
+         join_all_task_parameter_data(is_outer=outer_join_task_parameters).
+         join_task_time_interval().
+         join_neems().join_neems_environment().
+         order_by_interval_begin()
+         )
+        return self
+
+    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = False) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
@@ -125,7 +149,6 @@ class NeemInterface(NeemQuery):
          select_from_tasks().
          join_task_types().
          join_all_task_participants_data(is_outer=not participant_necessary).
-         join_participant_base_link().
          join_task_time_interval().
          join_tf_on_time_interval().filter_tf_by_base_link().
          join_tf_transfrom().

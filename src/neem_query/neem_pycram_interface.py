@@ -8,8 +8,8 @@ from urllib import request
 import rospy
 from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
 
-from designators.action_designator import PickUpAction
-from designators.object_designator import BelieveObject
+from pycram.designators.action_designator import PickUpAction
+from pycram.designators.object_designator import BelieveObject
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
@@ -40,6 +40,9 @@ class NEEMObjectMetadata:
     """
     neem_id: str
     object_name: str
+
+    def __hash__(self):
+        return hash((self.neem_id, self.object_name))
 
 
 @dataclass
@@ -120,8 +123,8 @@ class PyCRAMNEEMInterface(NeemInterface):
          neem_id, action, participant, performed_by.
         """
         self.query_pick_actions(neem_id)
-        neem_objects = self.get_and_spawn_neem_objects()
         environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects()
+        participant_desig = list(participant_desigs.values())[0]
         grasps = [g.name.lower() for g in Grasp]
         arms = [arm.name.lower() for arm in Arms]
         PickUpAction(participant_desig, arms, grasps).resolve().perform()
@@ -148,19 +151,23 @@ class PyCRAMNEEMInterface(NeemInterface):
                             for metadata, object_ in neem_objects.performers.items()}
         return environment_desig, participant_desigs, performer_desigs
 
-    def query_pick_actions(self, neem_id: Optional[str] = None) -> NeemQuery:
+    def query_pick_actions(self, neem_id: Optional[int] = None) -> NeemQuery:
         """
         Get the query to redo pick actions from neem(s) using PyCRAM.
         The query should contain:
          neem_id, action, participant, performed_by.
-        :param neem_id: the id of the NEEM, if None, all NEEMs are considered.
+        :param neem_id: the id of the NEEM in sql, if None, all NEEMs are considered.
         """
-        (self.select_neem_id().select_participant().select_participant_type().select_from_tasks()
+        (self.select_sql_neem_id().select_environment().select_participant().select_participant_type()
+         .select_is_performed_by()
+         .select_from_tasks()
+         .join_neems().join_neems_environment()
          .join_task_types()
          .join_task_participants().join_participant_types()
-         .filter_by_task_type('soma:PickingUp'))
+         .join_is_performed_by()
+         .filter_by_task_types(['soma:PickingUp']))
         if neem_id is not None:
-            self.filter_by_sql_neem_id(neem_id)
+            self.filter_by_sql_neem_id([neem_id])
         return self
 
     def replay_neem_motions(self):
@@ -428,8 +435,9 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param object_name: The name of the object.
         :return: The mesh link of the object.
         """
-        mesh_path_df = self.query_result.filter_by_participant(object_name).filter_by_neem_id(neem_id).df
+        mesh_path_df = self.query_result.filter_by_participant([object_name]).filter_by_neem_id([neem_id]).df
         mesh_path_df = mesh_path_df.dropna(subset=[CL.object_mesh_path.value]).drop_duplicates()
+        print(mesh_path_df)
         mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
         if mesh_path is None:
             return None

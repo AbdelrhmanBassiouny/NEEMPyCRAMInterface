@@ -21,101 +21,109 @@ class QueryResult:
         """
         self.df = df
 
-    def filter_by_neem_id(self, neem_id: str) -> 'QueryResult':
+    def filter_by_neem_id(self, neem_ids: List[str]) -> 'QueryResult':
         """
         Get the data of a certain NEEM from the query result DataFrame
-        :param neem_id: the NEEM ID.
+        :param neem_ids: the NEEM IDs.
         :return: the data of the NEEM.
         """
-        return self.filter_dataframe({CL.neem_id.value: neem_id})
+        return self.filter_dataframe({CL.neem_id.value: neem_ids})
 
-    def filter_by_participant_type(self, participant_type: str) -> 'QueryResult':
+    def filter_by_participant_type(self, participant_types: List[str]) -> 'QueryResult':
         """
         Get the data of a certain participant type from the query result DataFrame.
-        :param participant_type: the participant type.
+        :param participant_types: the participant types.
         :return: the data of the participant type.
         """
-        return self.filter_dataframe({CL.participant_type.value: participant_type})
+        return self.filter_dataframe({CL.participant_type.value: participant_types})
 
-    def filter_by_participant(self, participant: str) -> 'QueryResult':
+    def filter_by_participant(self, participants: List[str]) -> 'QueryResult':
         """
         Get the data of a certain participant from the query result DataFrame.
-        :param participant: the participant.
-        :return: the data of the participant.
+        :param participants: the participants.
+        :return: the data of the participants.
         """
-        return self.filter_dataframe({CL.participant.value: participant})
+        return self.filter_dataframe({CL.participant.value: participants})
 
-    def filter_by_task(self, task: str) -> 'QueryResult':
+    def filter_by_task(self, tasks: List[str]) -> 'QueryResult':
         """
         Get the data of a certain task from the query result DataFrame.
-        :param task: the task name.
-        :return: the data of the task.
+        :param tasks: the task names.
+        :return: the data of the tasks.
         """
-        return self.filter_dataframe({CL.task.value: task})
+        return self.filter_dataframe({CL.task.value: tasks})
 
-    def filter_by_task_type(self, task_type: str) -> 'QueryResult':
+    def filter_by_task_type(self, task_types: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain task type from the query result DataFrame.
-        :param task_type: the task type.
-        :return: the data of the task type.
+        Get the data of certain task types from the query result DataFrame.
+        :param task_types: the task types.
+        :return: the data of the task types.
         """
-        return self.filter_dataframe({CL.task_type.value: task_type})
+        return self.filter_dataframe({CL.task_type.value: task_types})
 
-    def filter_by_subtask(self, subtask: str) -> 'QueryResult':
+    def filter_by_subtask(self, subtasks: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain subtask from the query result DataFrame.
-        :param subtask: the subtask name.
-        :return: the data of the subtask.
+        Get the data of certain subtasks from the query result DataFrame.
+        :param subtasks: the subtask names.
+        :return: the data of the subtasks.
         """
-        return self.filter_dataframe({CL.subtask.value: subtask})
+        return self.filter_dataframe({CL.subtask.value: subtasks})
 
-    def filter_by_subtask_type(self, subtask_type: str) -> 'QueryResult':
+    def filter_by_subtask_type(self, subtask_types: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain subtask type from the query result DataFrame.
-        :param subtask_type: the subtask type.
-        :return: the data of the subtask type.
+        Get the data of certain subtask types from the query result DataFrame.
+        :param subtask_types: the subtask types.
+        :return: the data of the subtask types.
         """
-        return self.filter_dataframe({CL.subtask_type.value: subtask_type})
+        return self.filter_dataframe({CL.subtask_type.value: subtask_types})
 
-    def filter_by_task_parameter(self, task_parameter: str) -> 'QueryResult':
+    def filter_by_task_parameter(self, task_parameters: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain task parameter from the query result DataFrame.
-        :param task_parameter: the task parameter.
+        Get the data of certain task parameters from the query result DataFrame.
+        :param task_parameters: the task parameter.
         :return: the data of the task parameter.
         """
-        return self.filter_dataframe({CL.task_parameter.value: task_parameter})
+        return self.filter_dataframe({CL.task_parameter.value: task_parameters})
 
-    def filter_by_task_parameter_category(self, task_parameter_category: str) -> 'QueryResult':
+    def filter_by_task_parameter_category(self, task_parameter_categories: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain task parameter category from the query result DataFrame.
-        :param task_parameter_category: the task parameter category.
-        :return: the data of the task parameter category.
+        Get the data of certain task parameter categories from the query result DataFrame.
+        :param task_parameter_categories: the task parameter categories.
+        :return: the data of the task parameter categories.
         """
-        return self.filter_dataframe({CL.task_parameter_category.value: task_parameter_category})
+        return self.filter_dataframe({CL.task_parameter_category.value: task_parameter_categories})
 
-    def filter_by_task_parameter_type(self, task_parameter_type: str) -> 'QueryResult':
+    def filter_by_task_parameter_type(self, task_parameter_types: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain task parameter type from the query result DataFrame.
-        :param task_parameter_type: the task parameter type.
-        :return: the data of the task parameter type.
+        Get the data of certain task parameter types from the query result DataFrame.
+        :param task_parameter_types: the task parameter types.
+        :return: the data of the task parameter types.
         """
-        return self.filter_dataframe({CL.task_parameter_type.value: task_parameter_type})
+        return self.filter_dataframe({CL.task_parameter_type.value: task_parameter_types})
 
-    def filter_by_agent(self, agent: str) -> 'QueryResult':
+    def filter_by_agent(self, agents: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain agent from the query result DataFrame.
-        :param agent: the agent.
-        :return: the data of the agent.
+        Get the data of certain agents from the query result DataFrame.
+        :param agents: the agents.
+        :return: the data of the agents.
         """
-        return self.filter_dataframe({CL.agent.value: agent})
+        return self.filter_dataframe({CL.agent.value: agents})
 
-    def filter_by_agent_type(self, agent_type: str) -> 'QueryResult':
+    def filter_by_agent_type(self, agent_types: List[str]) -> 'QueryResult':
         """
-        Get the data of a certain agent type from the query result DataFrame.
-        :param agent_type: the agent type.
-        :return: the data of the agent type.
+        Get the data of certain agent types from the query result DataFrame.
+        :param agent_types: the agent types.
+        :return: the data of the agent types.
         """
-        return self.filter_dataframe({CL.agent_type.value: agent_type})
+        return self.filter_dataframe({CL.agent_type.value: agent_types})
+
+    def filter_by_sql_neem_id(self, neem_ids: List[int]) -> 'QueryResult':
+        """
+        Get the data of certain NEEMs from the query result DataFrame
+        :param neem_ids: the NEEM IDs.
+        :return: the data of the NEEMs.
+        """
+        return self.filter_dataframe({CL.neem_sql_id.value: neem_ids})
 
     def filter_dataframe(self, filters: dict) -> 'QueryResult':
         """
@@ -134,12 +142,13 @@ class QueryResult:
         """
         initial_condition = True
         indices = None
-        for column, value in filters.items():
+        for column, values in filters.items():
+            new_indices = np.logical_or.reduce([self.df[column] == v for v in values])
             if initial_condition:
-                indices = self.df[column] == value
+                indices = new_indices
                 initial_condition = False
             else:
-                indices = indices & (self.df[column] == value)
+                indices = indices & new_indices
         return indices
 
     def normalize_time(self) -> 'QueryResult':
@@ -200,7 +209,7 @@ class QueryResult:
         neem_ids = self.get_neem_ids()
         entities_per_neem = []
         for neem_id in neem_ids:
-            entities = self.filter_by_neem_id(neem_id).get_column_values(entity, unique)
+            entities = self.filter_by_neem_id([neem_id]).get_column_values(entity, unique)
             entities_per_neem.extend([(neem_id, neem_entity) for neem_entity in entities])
         return entities_per_neem
 

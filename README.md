@@ -23,7 +23,7 @@ from neem_query.neem_interface import NeemInterface
 ni = NeemInterface("mysql+pymysql://newuser:password@localhost/test")
 
 neem_id = 2
-df = ni.get_task_sequence_of_neem(neem_id).get_result().df
+df = ni.query_task_sequence_of_neem(neem_id).get_result().df
 
 print(df)
 ```

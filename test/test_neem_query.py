@@ -65,7 +65,7 @@ class TestNeemSqlAlchemy(TestCase):
               join_tf_on_time_interval().
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
-              filter_by_task_type("Pour", regexp=True).order_by_stamp()).get_result().df
+              filter_by_task_types("Pour", regexp=True).order_by_stamp()).get_result().df
         self.assertTrue(len(df) > 0)
 
     def test_get_neem(self):
@@ -100,9 +100,9 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_join_object_mesh_path(self):
         df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
-              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value:5}).df
+              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value:[5]}).df
         self.assertTrue(len(df) > 0)
 
     def test_get_unique_task_types(self):
         df = self.nq.select_task_type().select_from_tasks().join_task_types().distinct().get_result().df
-        print(df)
+        self.assertTrue(len(df) > 0)

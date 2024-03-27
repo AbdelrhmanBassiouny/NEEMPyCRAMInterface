@@ -17,7 +17,7 @@ class TestNeemInterface(TestCase):
     def setUpClass(cls):
         # Connection to MariaDB NEEM database.
         cls.ni = NeemInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.all_neem_plans = cls.ni.get_all_plans().select_participant().select_neem_id().get_result()
+        cls.all_neem_plans = cls.ni.query_plans().select_participant().get_result()
 
     def test_get_neem_ids(self):
         neem_ids = self.all_neem_plans.get_neem_ids()
@@ -26,12 +26,12 @@ class TestNeemInterface(TestCase):
 
     def test_filter_by_neem_id(self):
         neem_ids = self.all_neem_plans.get_neem_ids()
-        neem_df = self.all_neem_plans.filter_by_neem_id(neem_ids[0]).df
+        neem_df = self.all_neem_plans.filter_by_neem_id([neem_ids[0]]).df
         self.assertIsInstance(neem_df, pd.DataFrame)
         self.assertTrue(len(neem_df) > 0)
 
     def test_filter_by_participant_type(self):
-        neem_df = self.all_neem_plans.filter_by_participant_type('soma:DesignedContainer').df
+        neem_df = self.all_neem_plans.filter_by_participant_type(['soma:DesignedContainer']).df
         self.assertIsInstance(neem_df, pd.DataFrame)
         self.assertTrue(len(neem_df) > 0)
 
@@ -41,17 +41,17 @@ class TestNeemInterface(TestCase):
         self.assertTrue(len(participants) > 0)
 
     def test_get_task_sequence_of_neem(self):
-        df = self.ni.get_task_sequence_of_neem(2).get_result().df
+        df = self.ni.query_task_sequence_of_neem(2).get_result().df
         self.assertIsInstance(df, pd.DataFrame)
 
     def test_get_plan_of_neem(self):
-        df = self.ni.get_plan_of_neem(2).get_result().df
+        df = self.ni.query_plan_of_neem(2).get_result().df
         self.assertIsInstance(df, pd.DataFrame)
 
     def test_abstraction_levels(self):
         self.ni.reset()
         neem_id = 2
-        df1 = self.ni.get_task_sequence_of_neem(neem_id).get_result().df
+        df1 = self.ni.query_task_sequence_of_neem(neem_id).get_result().df
 
         self.ni.reset()
 
@@ -89,3 +89,9 @@ class TestNeemInterface(TestCase):
 
         self.assertTrue(df1.equals(df2))
         self.assertTrue(df1.equals(df3))
+
+    def test_get_task_semantic_data(self):
+        df = self.ni.query_tasks_semantic_data(['Pick', 'Pour']).get_result().df
+        self.assertIsInstance(df, pd.DataFrame)
+        self.assertTrue(len(df) > 0)
+        print(df)

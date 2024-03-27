@@ -4,10 +4,11 @@ import pandas as pd
 from sqlalchemy import (create_engine, Engine, between, and_, func, Table, BinaryExpression, select,
                         Select, not_, or_)
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
+from sqlalchemy.testing import in_
 from typing_extensions import Optional, List, Dict
 
 from .enums import (column_to_label, ColumnLabel as CL, TaskType, ParticipantType, SubTaskType, SubTask,
-                    TaskParameterType, TaskParameterCategory, Agent, AgentType)
+                    TaskParameterType, TaskParameterCategory, Agent, AgentType, IsPerformedByType)
 from .neems_database import *
 from .query_result import QueryResult
 
@@ -563,11 +564,8 @@ class NeemQuery:
         :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {TaskParameterType: and_(TaskParameterType.s == TaskParameterCategory.dul_Entity_o,
-                                         TaskParameterType.neem_id == TaskParameterCategory.neem_id)}
-        outer_join = {TaskParameterType: is_outer}
-        self._update_joins_metadata(joins, outer_joins=outer_join)
-        return self
+        return self.join_type(TaskParameterType, TaskParameterCategory, TaskParameterCategory.dul_Entity_o,
+                              is_outer=is_outer)
 
     def join_all_agent_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -612,6 +610,14 @@ class NeemQuery:
         outer_join = {SomaIsPerformedBy: is_outer}
         self._update_joins_metadata(joins, outer_joins=outer_join)
         return self
+
+    def join_is_performed_by_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the is performed by type table. Assumes SomaIsPerformedBy has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self.join_type(IsPerformedByType, SomaIsPerformedBy, SomaIsPerformedBy.dul_Agent_o, is_outer=is_outer)
 
     def join_object_mesh_path(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -875,6 +881,14 @@ class NeemQuery:
         self.update_selected_columns([SomaIsPerformedBy.dul_Agent_o])
         return self
 
+    def select_is_performed_by_type(self) -> 'NeemQuery':
+        """
+        Select is performed by type column.
+        :return: the modified query.
+        """
+        self.select_type(IsPerformedByType)
+        return self
+
     def select_sql_neem_id(self) -> 'NeemQuery':
         """
         Select the neem_id column.
@@ -1019,50 +1033,52 @@ class NeemQuery:
         self.update_joins({table: on})
         return self
 
-    def filter_by_task_type(self, task: str, regexp: Optional[bool] = False) -> 'NeemQuery':
+    def filter_by_task_types(self, tasks: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
         """
-        Filter the query by task type.
-        :param task: the task type.
+        Filter the query by task types.
+        :param tasks: the task types.
         :param regexp: whether to use regex to filter the task type or not (will use the sql like operator).
         :return: the modified query.
         """
-        return self.filter_by_type(TaskType, task, regexp)
+        return self.filter_by_type(TaskType, tasks, regexp)
 
-    def filter_by_participant_type(self, participant: str, regexp: Optional[bool] = False) -> 'NeemQuery':
+    def filter_by_participant_type(self, participants: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by participant type.
-        :param participant: the participant type.
+        :param participants: the participant types.
         :param regexp: whether to use regex to filter the participant type or not (will use the sql like operator).
         :return: the modified query.
         """
-        return self.filter_by_type(ParticipantType, participant, regexp)
+        return self.filter_by_type(ParticipantType, participants, regexp)
 
-    def filter_by_type(self, type_table: Table, type_: str,
+    def filter_by_type(self, type_table: Table, types: List[str],
                        regexp: Optional[bool] = False,
                        use_not_: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by type.
         :param type_table: the type table.
-        :param type_: the type.
+        :param types: the types.
         :param regexp: whether to use regex to filter the type or not (will use the sql like operator).
         :param use_not_: whether to negate the filter or not.
         :return: the modified query.
         """
         if regexp:
-            cond = type_table.o.like(f"%{type_}%")
+            cond = [type_table.o.like(f"%{t}%") for t in types]
         else:
-            cond = type_table.o == type_
+            cond = [type_table.o == t for t in types]
+        cond = or_(*cond)
         if use_not_:
             cond = not_(cond)
         self.filters.append(cond)
         return self
 
-    def filter_by_sql_neem_id(self, neem_id: int) -> 'NeemQuery':
+    def filter_by_sql_neem_id(self, neem_ids: List[int]) -> 'NeemQuery':
         """
         Filter the query by neem_id.
-        :param neem_id: the neem_id.
+        :param neem_ids: the neem_ids.
         :return: the modified query.
         """
+        in_
         self.filters.append(Neem.ID == neem_id)
         return self
 

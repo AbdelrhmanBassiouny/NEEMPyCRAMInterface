@@ -11,6 +11,7 @@ TaskParameterType = aliased(RdfType, name='TaskParameterType')
 TaskParameterCategory = aliased(DulClassify, name='TaskParameterCategory')
 Agent = aliased(DulClassify, name='Agent')
 AgentType = aliased(RdfType, name='AgentType')
+IsPerformedByType = aliased(RdfType, name='IsPerformedByType')
 
 Initialized = None
 
@@ -48,6 +49,7 @@ class ColumnLabel(Enum):
     agent_type = "agent_type"
     neem_sql_id = "neem_sql_id"
     is_performed_by = "is_performed_by"
+    is_performed_by_type = "is_performed_by_type"
     object_mesh_path = "object_mesh_path"
 
 
@@ -80,6 +82,7 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    Agent.dul_Entity_o: ColumnLabel.agent.value,
                    AgentType.o: ColumnLabel.agent_type.value,
                    SomaIsPerformedBy.dul_Agent_o: ColumnLabel.is_performed_by.value,
+                   IsPerformedByType.o: ColumnLabel.is_performed_by_type.value,
                    SomaHasFilePath.o: ColumnLabel.object_mesh_path.value}
 
 
