@@ -1078,8 +1078,7 @@ class NeemQuery:
         :param neem_ids: the neem_ids.
         :return: the modified query.
         """
-        in_
-        self.filters.append(Neem.ID == neem_id)
+        self.filters.append(Neem.ID.in_(neem_ids))
         return self
 
     def filter_by_neem_id(self, neem_id: str) -> 'NeemQuery':

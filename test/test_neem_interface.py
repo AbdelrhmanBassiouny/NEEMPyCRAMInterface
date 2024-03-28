@@ -6,7 +6,7 @@ from neem_query.enums import TaskType
 from neem_query.neem_interface import NeemInterface
 from neem_query.neems_database import *
 from neem_query.query_result import QueryResult
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 
 class TestNeemInterface(TestCase):
@@ -18,6 +18,10 @@ class TestNeemInterface(TestCase):
         # Connection to MariaDB NEEM database.
         cls.ni = NeemInterface('mysql+pymysql://newuser:password@localhost/test')
         cls.all_neem_plans = cls.ni.query_plans().select_participant().get_result()
+        cls.ni.reset()
+
+    def tearDown(self):
+        self.ni.reset()
 
     def test_get_neem_ids(self):
         neem_ids = self.all_neem_plans.get_neem_ids()
@@ -49,7 +53,6 @@ class TestNeemInterface(TestCase):
         self.assertIsInstance(df, pd.DataFrame)
 
     def test_abstraction_levels(self):
-        self.ni.reset()
         neem_id = 2
         df1 = self.ni.query_task_sequence_of_neem(neem_id).get_result().df
 
@@ -60,7 +63,7 @@ class TestNeemInterface(TestCase):
                select_neem_id().
                select_from_tasks().
                join_task_types().
-               join_neems().filter_by_sql_neem_id(neem_id).
+               join_neems().filter_by_sql_neem_id([neem_id]).
                join_task_time_interval().
                order_by_interval_begin()).get_result().df
 
@@ -94,4 +97,18 @@ class TestNeemInterface(TestCase):
         df = self.ni.query_tasks_semantic_data(['Pick', 'Pour']).get_result().df
         self.assertIsInstance(df, pd.DataFrame)
         self.assertTrue(len(df) > 0)
-        print(df)
+
+    def test_get_abhijit_pouring_tfs(self):
+        (self.ni.select_tf_columns().select(
+            Neem.created_by).select_participant_type().select_task_type().select_tf_transform_columns().
+         select_from_tasks().
+         join_task_time_interval().
+         join_tf_on_time_interval(begin_offset=0).join_tf_transfrom().join_task_types().
+         filter_by_task_types(['Pour'], regexp=True).limit(100).
+         join_all_task_participants_data().filter_tf_by_base_link().join_neems().
+         filter(Neem.created_by.in_(['Abhijit Vyas','Abhijit']))
+         )
+        qr = self.ni.get_result()
+        df = qr.df
+        self.assertTrue(len(df) > 0)
+

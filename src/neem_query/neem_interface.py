@@ -74,14 +74,14 @@ class NeemInterface(NeemQuery):
          join_all_task_parameter_data(is_outer=True).join_is_performed_by().join_object_mesh_path(is_outer=True))
         return self
 
-    def query_task_sequence_of_neem(self, neem_id: int) -> NeemQuery:
+    def query_task_sequence_of_neem(self, sql_neem_id: int) -> NeemQuery:
         """
         Get the task tree of a plan of a certain neem.
-        :param neem_id: The id in (ID) column of the Neems table.
+        :param sql_neem_id: The sql ID column of the Neems table.
         :return: The task tree of a single neem as a neem query.
         """
         # noinspection PyTypeChecker
-        self.query_task_sequence().join_neems().filter_by_sql_neem_id(neem_id)
+        self.query_task_sequence().join_neems().filter_by_sql_neem_id([sql_neem_id])
         return self
 
     def query_task_sequence(self) -> NeemQuery:
