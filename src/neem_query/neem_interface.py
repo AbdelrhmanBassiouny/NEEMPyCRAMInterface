@@ -121,8 +121,9 @@ class NeemInterface(NeemQuery):
         :return: the query.
         """
         self.reset()
-        (self.select_task_type().select_participant().select_participant_type().select_environment().
-         select_is_performed_by().select_is_performed_by_type().select_parameter_type().select_sql_neem_id().
+        (self.select_neem_id().select_sql_neem_id().select_task().select_task_type().select_participant().
+         select_participant_type().select_environment().select_is_performed_by().select_is_performed_by_type()
+         .select_parameter_type().
          select_from_tasks().
          join_task_types().filter_by_task_types(tasks, regexp=regexp).
          join_task_participants(is_outer=True).

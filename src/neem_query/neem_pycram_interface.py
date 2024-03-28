@@ -8,11 +8,11 @@ from urllib import request
 import rospy
 from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
 
-from pycram.designators.action_designator import PickUpAction
-from pycram.designators.object_designator import BelieveObject
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
+from pycram.designators.action_designator import PickUpAction
+from pycram.designators.object_designator import BelieveObject
 from pycram.world import World
 from pycram.world_concepts.world_object import Object
 from .enums import ColumnLabel as CL
@@ -65,22 +65,27 @@ class PyCRAMNEEMInterface(NeemInterface):
 
     action_designator_inspector = ModuleInspector(action_designator.__name__)
     pycram_actions = action_designator_inspector.get_all_classes_dict()
-    soma_to_pycram = {'soma:Grasping': pycram_actions['GraspingAction'],
-                      'soma:PositioningArm': pycram_actions['ParkArmsAction'],
-                      'soma:SettingGripper': pycram_actions['SetGripperAction'],
-                      'soma:LookingAt': pycram_actions['LookAtAction'],
-                      'soma:Releasing': pycram_actions['ReleaseAction'],
-                      'soma:PickingUp': pycram_actions['PickUpAction'],
-                      'soma:Placing': pycram_actions['PlaceAction'],
-                      'soma:Gripping': pycram_actions['GripAction'],
-                      'soma:Closing': pycram_actions['CloseAction'],
-                      'soma:Opening': pycram_actions['OpenAction'],
-                      'soma:OpeningGripper': pycram_actions['SetGripperAction'],
-                      'soma:Navigating': pycram_actions['NavigateAction'],
-                      'soma:Delivering': pycram_actions['TransportAction'],
-                      'soma:Detecting': pycram_actions['DetectAction'],
-                      'soma:AssumingArmPose:': pycram_actions['ParkArmsAction'],
-                      }
+    soma_to_pycram_actions = {'soma:Grasping': pycram_actions['GraspingAction'],
+                              'soma:PositioningArm': pycram_actions['ParkArmsAction'],
+                              'soma:SettingGripper': pycram_actions['SetGripperAction'],
+                              'soma:LookingAt': pycram_actions['LookAtAction'],
+                              'soma:Releasing': pycram_actions['ReleaseAction'],
+                              'soma:PickingUp': pycram_actions['PickUpAction'],
+                              'soma:Placing': pycram_actions['PlaceAction'],
+                              'soma:Gripping': pycram_actions['GripAction'],
+                              'soma:Closing': pycram_actions['CloseAction'],
+                              'soma:Opening': pycram_actions['OpenAction'],
+                              'soma:OpeningGripper': pycram_actions['SetGripperAction'],
+                              'soma:Navigating': pycram_actions['NavigateAction'],
+                              'soma:Delivering': pycram_actions['TransportAction'],
+                              'soma:Detecting': pycram_actions['DetectAction'],
+                              'soma:AssumingArmPose:': pycram_actions['ParkArmsAction'],
+                              }
+
+    soma_to_pycram_grasps = {'soma:FrontGrasp': Grasp.FRONT,
+                             'soma:TopGrasp': Grasp.TOP,
+                             'soma:LeftGrasp': Grasp.LEFT,
+                             'soma:RightGrasp': Grasp.RIGHT}
 
     def __init__(self, db_url: str):
         """
@@ -107,8 +112,8 @@ class PyCRAMNEEMInterface(NeemInterface):
                                                                         self.get_stamp()):
             # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
             # TODO: Create designators for objects.
-            if task in self.soma_to_pycram:
-                action = self.soma_to_pycram[task]
+            if task in self.soma_to_pycram_actions:
+                action = self.soma_to_pycram_actions[task]
                 action_description = action(parameters)
                 action_description.ground()
                 action_description.resolve()
@@ -116,34 +121,44 @@ class PyCRAMNEEMInterface(NeemInterface):
             else:
                 logging.warning(f'No action found for task {task}')
 
-    def redo_pick_action_for_neem(self, neem_id: str):
+    def redo_pick_action(self, sql_neem_id: Optional[int] = None):
         """
         Redo pick actions from neem(s) using PyCRAM.
         The query should contain:
          neem_id, action, participant, performed_by.
         """
-        self.query_pick_actions(neem_id)
-        environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects()
+        self.query_pick_actions(sql_neem_id)
+        tasks = self.query_result.get_tasks(unique=True)
+        task = tasks[0]
+        qr = self.query_result.filter_by_task([task])
+        print(qr.df)
+        environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects(qr)
         participant_desig = list(participant_desigs.values())[0]
-        grasps = [g.name.lower() for g in Grasp]
+        grasp = qr.get_task_parameter_types()[0]
+        if grasp in self.soma_to_pycram_grasps:
+            grasps = [self.soma_to_pycram_grasps[grasp]]
+        else:
+            grasps = [g.name.lower() for g in Grasp]
         arms = [arm.name.lower() for arm in Arms]
         PickUpAction(participant_desig, arms, grasps).resolve().perform()
 
-    def get_and_spawn_neem_objects(self) -> NEEMObjects:
+    def get_and_spawn_neem_objects(self, query_result: QueryResult) -> NEEMObjects:
         """
         Get and spawn the objects in the NEEM using PyCRAM.
+        :param query_result: the query result to get the objects from.
         """
-        environment_obj = self.get_and_spawn_environment()
-        participant_objects = self.get_and_spawn_participants()
-        performer_objects = self.get_and_spawn_performers()
+        environment_obj = self.get_and_spawn_environment(query_result)
+        participant_objects = self.get_and_spawn_participants(query_result)
+        performer_objects = self.get_and_spawn_performers(query_result)
         return NEEMObjects(environment_obj, participant_objects, performer_objects)
 
-    def get_designators_for_neem_objects(self) -> \
+    def get_designators_for_neem_objects(self, query_result: QueryResult) -> \
             Tuple[BelieveObject, Dict[NEEMObjectMetadata, BelieveObject], Dict[NEEMObjectMetadata, BelieveObject]]:
         """
         Get the designators for the objects in the NEEM.
+        :param query_result: the query result to get the objects from.
         """
-        neem_objects = self.get_and_spawn_neem_objects()
+        neem_objects = self.get_and_spawn_neem_objects(query_result)
         environment_desig = BelieveObject(names=[neem_objects.environment.name])
         participant_desigs = {metadata: BelieveObject(names=[object_.name])
                               for metadata, object_ in neem_objects.participants.items()}
@@ -158,14 +173,7 @@ class PyCRAMNEEMInterface(NeemInterface):
          neem_id, action, participant, performed_by.
         :param neem_id: the id of the NEEM in sql, if None, all NEEMs are considered.
         """
-        (self.select_sql_neem_id().select_environment().select_participant().select_participant_type()
-         .select_is_performed_by()
-         .select_from_tasks()
-         .join_neems().join_neems_environment()
-         .join_task_types()
-         .join_task_participants().join_participant_types()
-         .join_is_performed_by()
-         .filter_by_task_types(['soma:PickingUp']))
+        self.query_tasks_semantic_data(['soma:PickingUp'], outer_join_task_parameters=False)
         if neem_id is not None:
             self.filter_by_sql_neem_id([neem_id])
         return self
@@ -205,52 +213,63 @@ class PyCRAMNEEMInterface(NeemInterface):
         neem_ids = self.get_neem_ids(unique=False)
         return ReplayNEEMMotionData(poses, times, participant_instances, neem_ids)
 
-    def get_and_spawn_environment_and_participants(self) -> Tuple[Object, Dict[NEEMObjectMetadata, Object]]:
+    def get_and_spawn_environment_and_participants(self, query_result: QueryResult)\
+            -> Tuple[Object, Dict[NEEMObjectMetadata, Object]]:
         """
         Get and spawn the environment and participants in the NEEM using PyCRAM.
+        :param query_result: the query result to get the environment and participants from.
+        :return: the environment and participants as PyCRAM objects.
         """
-        environment_obj = self.get_and_spawn_environment()
-        participant_objects = self.get_and_spawn_participants()
+        environment_obj = self.get_and_spawn_environment(query_result)
+        participant_objects = self.get_and_spawn_participants(query_result)
         return environment_obj, participant_objects
 
-    def get_and_spawn_environment(self) -> Object:
+    def get_and_spawn_environment(self, query_result: QueryResult) -> Object:
         """
         Get and spawn the environment in the NEEM using PyCRAM.
+        :param query_result: the query result to get the environment from.
         :return: the environment as a PyCRAM object.
         """
-        environments = self.query_result.get_environments()
+        environments = query_result.get_environments()
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
 
-    def get_and_spawn_performers(self) -> Dict[NEEMObjectMetadata, Object]:
+    def get_and_spawn_performers(self, query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the agents in the NEEM using PyCRAM.
+        :param query_result: the query result to get the agents from.
         :return: the agents as a dictionary of PyCRAM objects.
         """
         return self.get_and_spawn_entities(CL.is_performed_by.value,
-                                           self.get_description_of_performer,
-                                           lambda _: ObjectType.ROBOT)
+                                           lambda agent, _: self.get_description_of_performer(agent),
+                                           lambda _: ObjectType.ROBOT,
+                                           query_result)
 
-    def get_and_spawn_participants(self) -> Dict[NEEMObjectMetadata, Object]:
+    def get_and_spawn_participants(self, query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the participants in the NEEM using PyCRAM.
+        :param query_result: the query result to get the participants from.
         :return: the participants as a dictionary of PyCRAM objects.
         """
         return self.get_and_spawn_entities(CL.participant.value,
                                            self.get_description_of_participant,
-                                           self.get_object_type)
+                                           self.get_object_type,
+                                           query_result)
 
-    def get_and_spawn_entities(self, entity_column_name: str,
+    @staticmethod
+    def get_and_spawn_entities(entity_column_name: str,
                                description_getter: Callable[[str, str], str],
-                               object_type_getter: Callable[[str], ObjectType]) -> Dict[NEEMObjectMetadata, Object]:
+                               object_type_getter: Callable[[str], ObjectType],
+                               query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
         :param entity_column_name: the entity to get and spawn.
         :param description_getter: the function to get the description of the entity.
         :param object_type_getter: the function to get the type of the entity.
+        :param query_result: the query result to get the entities from.
         :return: the entities as a dictionary of PyCRAM objects.
         """
-        entities = self.query_result.get_column_value_per_neem(entity_column_name)
+        entities = query_result.get_column_value_per_neem(entity_column_name)
         entity_objects = {}
         neem_entities = []
         for neem, neem_entity in entities:
@@ -270,11 +289,10 @@ class PyCRAMNEEMInterface(NeemInterface):
         return entity_objects
 
     @staticmethod
-    def get_description_of_performer(agent: str, neem_id: Optional[str] = None) -> str:
+    def get_description_of_performer(agent: str) -> str:
         """
         Get the description of an agent.
         :param agent: the agent to get the description of.
-        :param neem_id: the id of the NEEM.
         :return: the description of the agent.
         """
         if 'pr2' in agent.lower():

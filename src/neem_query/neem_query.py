@@ -25,6 +25,7 @@ class NeemQuery:
                                          'bielefeld_study_neem/meshes/']
 
     def __init__(self, sql_uri: str):
+        self._select_neem_id: bool = False
         self.engine = create_engine(sql_uri)
         self.session = sessionmaker(bind=self.engine)()
         self.query: Optional[Select] = None
@@ -274,6 +275,12 @@ class NeemQuery:
         :return: the query.
         """
         query = None
+        if self._select_neem_id:
+            neem_id = self.find_neem_id(look_in_selected=True)
+            if neem_id is None:
+                logging.error("No neem_id found in the tables")
+                raise ValueError("No neem_id found in the tables")
+            self.update_selected_columns([neem_id])
         if len(self.selected_columns) > 0:
             selected_columns = []
             for col in self.selected_columns:
@@ -841,12 +848,7 @@ class NeemQuery:
         Select the neem_id column.
         :return: the modified query.
         """
-        neem_id = self.find_neem_id(look_in_selected=True)
-        if neem_id is not None:
-            self.update_selected_columns([neem_id])
-        else:
-            logging.error("No neem_id found in the tables")
-            raise ValueError("No neem_id found in the tables")
+        self._select_neem_id = True
         return self
 
     def select_neem_meta_data(self) -> 'NeemQuery':
@@ -1188,6 +1190,7 @@ class NeemQuery:
         self.latest_executed_query = None
         self.latest_result = None
         self._distinct = False
+        self._select_neem_id = False
 
     def __eq__(self, other):
         return self.construct_query() == other.construct_query()

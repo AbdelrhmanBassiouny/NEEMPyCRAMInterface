@@ -165,77 +165,90 @@ class QueryResult:
         :param unique: whether to return unique NEEM IDs or not.
         :return: the NEEM IDs.
         """
-        return self.get_column_values(CL.neem_id.value, unique)
+        return self.get_column_values(CL.neem_id.value, unique=unique)
 
-    def get_participants_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    def get_participants_per_neem(self, unique: Optional[bool] = True,
+                                  drop_na: Optional[bool] = False) -> List[Tuple[int, str]]:
         """
         Get the participants in each NEEM from the query result DataFrame.
         :param unique: whether to return unique participants or not.
+        :param drop_na: whether to drop None values or not.
         :return: the participants in each NEEM.
         """
-        return self.get_column_value_per_neem(CL.participant.value, unique)
+        return self.get_column_value_per_neem(CL.participant.value, unique=unique, drop_na=drop_na)
 
-    def get_participant_types_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    def get_participant_types_per_neem(self, unique: Optional[bool] = True,
+                                       drop_na: Optional[bool] = False) -> List[Tuple[int, str]]:
         """
         Get the participant_types in each NEEM from the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the participant_types in each NEEM.
         """
-        return self.get_column_value_per_neem(CL.participant_type.value, unique)
+        return self.get_column_value_per_neem(CL.participant_type.value, unique=unique, drop_na=drop_na)
 
-    def get_agents_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    def get_agents_per_neem(self, unique: Optional[bool] = True,
+                            drop_na: Optional[bool] = False) -> List[Tuple[int, str]]:
         """
         Get the agents in each NEEM from the query result DataFrame.
         :param unique: whether to return unique agents or not.
+        :param drop_na: whether to drop None values or not.
         :return: the agents in each NEEM.
         """
-        return self.get_column_value_per_neem(CL.agent.value, unique)
+        return self.get_column_value_per_neem(CL.agent.value, unique=unique, drop_na=drop_na)
 
-    def get_agent_types_per_neem(self, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    def get_agent_types_per_neem(self, unique: Optional[bool] = True,
+                                 drop_na: Optional[bool] = False) -> List[Tuple[int, str]]:
         """
         Get the agent_types in each NEEM from the query result DataFrame.
         :param unique: whether to return unique agent_types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the agent_types in each NEEM.
         """
-        return self.get_column_value_per_neem(CL.agent_type.value, unique)
+        return self.get_column_value_per_neem(CL.agent_type.value, unique=unique, drop_na=drop_na)
 
-    def get_column_value_per_neem(self, entity: str, unique: Optional[bool] = True) -> List[Tuple[str, str]]:
+    def get_column_value_per_neem(self, entity: str, unique: Optional[bool] = True,
+                                  drop_na: Optional[bool] = False) -> List[Tuple[int, str]]:
         """
         Get a specific entity (participant, agent, ...etc.) in each NEEM from the query result DataFrame.
         :param entity: the entity to get.
         :param unique: whether to return unique entities or not.
+        :param drop_na: whether to drop None values or not.
         :return: the entities in each NEEM.
         """
-        neem_ids = self.get_neem_ids()
+        neem_ids = self.get_sql_neem_ids(unique=True)
         entities_per_neem = []
         for neem_id in neem_ids:
-            entities = self.filter_by_neem_id([neem_id]).get_column_values(entity, unique)
+            entities = self.filter_by_neem_id([neem_id]).get_column_values(entity, unique=unique, drop_na=drop_na)
             entities_per_neem.extend([(neem_id, neem_entity) for neem_entity in entities])
         return entities_per_neem
 
-    def get_participants(self, unique: Optional[bool] = True) -> List[str]:
+    def get_participants(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the participants in the query result DataFrame.
         :param unique: whether to return unique participants or not.
+        :param drop_na: whether to drop None values or not.
         :return: the participants in the NEEM.
         """
-        return self.get_column_values(CL.participant.value, unique)
+        return self.get_column_values(CL.participant.value, unique=unique, drop_na=drop_na)
 
-    def get_participant_types(self, unique: Optional[bool] = True) -> List[str]:
+    def get_participant_types(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the participant_types in the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the participant_types in the NEEM.
         """
-        return self.get_column_values(CL.participant_type.value, unique)
+        return self.get_column_values(CL.participant_type.value, unique=unique, drop_na=drop_na)
 
-    def get_environments(self, unique: Optional[bool] = True) -> List[str]:
+    def get_environments(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the environments in the query result DataFrame.
         :param unique: whether to return unique environments or not.
+        :param drop_na: whether to drop None values or not.
         :return: the environment in the NEEM.
         """
-        return self.get_column_values(CL.environment.value, unique)
+        return self.get_column_values(CL.environment.value, unique=unique, drop_na=drop_na)
 
     def get_stamp(self) -> List[float]:
         """
@@ -275,79 +288,93 @@ class QueryResult:
                 self.df[CL.orientation_z.value].tolist(),
                 self.df[CL.orientation_w.value].tolist())
 
-    def get_all_subtask_types_of_task_type(self, task_type: str, unique: Optional[bool] = True) -> List[str]:
+    def get_all_subtask_types_of_task_type(self, task_type: str,
+                                           unique: Optional[bool] = True,
+                                           drop_na: Optional[bool] = False) -> List[str]:
         """
         Get all subtasks of a certain task type from the query result DataFrame.
         :param task_type: the task type.
         :param unique: whether to return unique subtasks or not.
+        :param drop_na: whether to drop None values or not.
         :return: the subtasks.
         """
-        return self.filter_by_task_type(task_type).get_subtask_types(unique=unique)
+        return self.filter_by_task_type([task_type]).get_subtask_types(unique=unique, drop_na=drop_na)
 
-    def get_all_task_types_of_subtask_type(self, subtask_type: str, unique: Optional[bool] = True) -> List[str]:
+    def get_all_task_types_of_subtask_type(self, subtask_type: str,
+                                           unique: Optional[bool] = True,
+                                           drop_na: Optional[bool] = False) -> List[str]:
         """
         Get all task types of a certain subtask type from the query result DataFrame.
         :param subtask_type: the subtask type.
         :param unique: whether to return unique task types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task types.
         """
-        return self.filter_by_subtask(subtask_type).get_task_types(unique=unique)
+        return self.filter_by_subtask([subtask_type]).get_task_types(unique=unique, drop_na=drop_na)
 
-    def get_tasks(self, unique: Optional[bool] = False) -> List[str]:
+    def get_tasks(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the tasks in the query result DataFrame.
         :param unique: whether to return unique tasks or not.
+        :param drop_na: whether to drop None values or not.
         :return: the tasks in the NEEM.
         """
-        return self.get_column_values(CL.task.value, unique)
+        return self.get_column_values(CL.task.value, unique=unique, drop_na=drop_na)
 
-    def get_task_types(self, unique: Optional[bool] = False) -> List[str]:
+    def get_task_types(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the task types in the query result DataFrame.
         :param unique: whether to return unique task types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task types in the NEEM.
         """
-        return self.get_column_values(CL.task_type.value, unique)
+        return self.get_column_values(CL.task_type.value, unique=unique, drop_na=drop_na)
 
-    def get_subtasks(self, unique: Optional[bool] = False) -> List[str]:
+    def get_subtasks(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the subtasks in the query result DataFrame.
         :param unique: whether to return unique subtasks or not.
+        :param drop_na: whether to drop None values or not.
         :return: the subtasks in the NEEM.
         """
-        return self.get_column_values(CL.subtask.value, unique)
+        return self.get_column_values(CL.subtask.value, unique=unique, drop_na=drop_na)
 
-    def get_subtask_types(self, unique: Optional[bool] = False) -> List[str]:
+    def get_subtask_types(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the subtask types in the query result DataFrame.
         :param unique: whether to return unique subtask types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the subtask types in the NEEM.
         """
-        return self.get_column_values(CL.subtask_type.value, unique)
+        return self.get_column_values(CL.subtask_type.value, unique=unique, drop_na=drop_na)
 
-    def get_task_parameters(self, unique: Optional[bool] = False) -> List[str]:
+    def get_task_parameters(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the task parameters in the query result DataFrame.
         :param unique: whether to return unique task parameters or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task parameters in the NEEM.
         """
-        return self.get_column_values(CL.task_parameter.value, unique)
+        return self.get_column_values(CL.task_parameter.value, unique=unique, drop_na=drop_na)
 
-    def get_task_parameter_categories(self, unique: Optional[bool] = False) -> List[str]:
+    def get_task_parameter_categories(self, unique: Optional[bool] = False,
+                                      drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the task parameter categories in the query result DataFrame.
         :param unique: whether to return unique task parameter categories or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task parameter categories in the NEEM.
         """
-        return self.get_column_values(CL.task_parameter_category.value, unique)
+        return self.get_column_values(CL.task_parameter_category.value, unique=unique, drop_na=drop_na)
 
-    def get_task_parameter_types(self, unique: Optional[bool] = False) -> List[str]:
+    def get_task_parameter_types(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the task parameter types in the query result DataFrame.
         :param unique: whether to return unique task parameter types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task parameter types in the NEEM.
         """
-        return self.get_column_values(CL.task_parameter_type.value, unique)
+        return self.get_column_values(CL.task_parameter_type.value, unique=unique, drop_na=drop_na)
 
     def get_time_intervals(self, unique: Optional[bool] = False) -> List[str]:
         """
@@ -371,59 +398,70 @@ class QueryResult:
         """
         return self.get_column_values(CL.time_interval_end.value, False)
 
-    def get_agents(self, unique: Optional[bool] = False) -> List[str]:
+    def get_agents(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the agents in the query result DataFrame.
         :param unique: whether to return unique agents or not.
+        :param drop_na: whether to drop None values or not.
         :return: the agents in the NEEM.
         """
-        return self.get_column_values(CL.agent.value, unique)
+        return self.get_column_values(CL.agent.value, unique=unique, drop_na=drop_na)
 
-    def get_agent_types(self, unique: Optional[bool] = False) -> List[str]:
+    def get_agent_types(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the agent types in the query result DataFrame.
         :param unique: whether to return unique agent types or not.
+        :param drop_na: whether to drop None values or not.
         :return: the agent types in the NEEM.
         """
-        return self.get_column_values(CL.agent_type.value, unique)
+        return self.get_column_values(CL.agent_type.value, unique=unique, drop_na=drop_na)
 
-    def get_tasks_of_agent(self, agent: str, unique: Optional[bool] = False) -> List[str]:
+    def get_tasks_of_agent(self, agent: str, unique: Optional[bool] = False,
+                           drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the tasks of a certain agent from the query result DataFrame.
         :param agent: the agent name.
         :param unique: whether to return unique tasks or not.
+        :param drop_na: whether to drop None values or not.
         :return: the tasks.
         """
-        return self.filter_by_participant(agent).get_tasks(unique)
+        return self.filter_by_participant([agent]).get_tasks(unique=unique, drop_na=drop_na)
 
-    def get_task_is_performed_by(self, unique: Optional[bool] = False) -> List[str]:
+    def get_task_is_performed_by(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the task performers in the query result DataFrame.
         :param unique: whether to return unique task performers or not.
+        :param drop_na: whether to drop None values or not.
         :return: the task performers in the NEEM.
         """
-        return self.get_column_values(CL.is_performed_by.value, unique)
+        return self.get_column_values(CL.is_performed_by.value, unique=unique, drop_na=drop_na)
 
-    def get_object_mesh_path(self, unique: Optional[bool] = False) -> List[str]:
+    def get_object_mesh_path(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the object mesh path in the query result DataFrame.
         :param unique: whether to return unique object mesh path or not.
+        :param drop_na: whether to drop None values or not.
         :return: the object mesh path in the NEEM.
         """
-        return self.get_column_values(CL.object_mesh_path.value, unique)
+        return self.get_column_values(CL.object_mesh_path.value, unique=unique, drop_na=drop_na)
 
-    def get_column_values(self, column: str, unique: Optional[bool] = False) -> List[Any]:
+    def get_column_values(self, column: str, unique: Optional[bool] = False,
+                          drop_na: Optional[bool] = False) -> List[Any]:
         """
         Get a column from the query result DataFrame.
         :param column: the column to get.
         :param unique: whether to return unique values or not.
+        :param drop_na: whether to drop None values or not.
         :return: the column values.
         """
         if unique:
             # filter from none values
             return self.df[column].dropna().unique().tolist()
         else:
-            return self.df[column].tolist()
+            if drop_na:
+                return self.df[column].dropna().tolist()
+            else:
+                return self.df[column].tolist()
 
     def get_multi_column_values(self, columns: List[str], unique: Optional[bool] = False) -> np.ndarray:
         """
@@ -443,3 +481,11 @@ class QueryResult:
         :return: the columns.
         """
         return self.df.columns.tolist()
+
+    def get_sql_neem_ids(self, unique):
+        """
+        Get the SQL NEEM IDs from the query result DataFrame.
+        :param unique: whether to return unique SQL NEEM IDs or not.
+        :return: the SQL NEEM IDs.
+        """
+        return self.get_column_values(CL.neem_sql_id.value, unique=unique)
