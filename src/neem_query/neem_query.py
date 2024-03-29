@@ -8,7 +8,8 @@ from sqlalchemy.testing import in_
 from typing_extensions import Optional, List, Dict
 
 from .enums import (column_to_label, ColumnLabel as CL, TaskType, ParticipantType, SubTaskType, SubTask,
-                    TaskParameterType, TaskParameterCategory, Agent, AgentType, IsPerformedByType)
+                    TaskParameterType, TaskParameterCategory, Agent, AgentType, IsPerformedByType,
+                    PerformerBaseLinkName, ParticipantBaseLinkName)
 from .neems_database import *
 from .query_result import QueryResult
 
@@ -466,12 +467,81 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
+    def join_base_link_name_on_performer_and_participant(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add base link name to the query,
+        Assumes DulHasParticipant and SomaIsPerformedBy have been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {UrdfHasBaseLinkName:
+                 or_(and_(UrdfHasBaseLinkName.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                          UrdfHasBaseLinkName.neem_id == DulHasParticipant.neem_id),
+                     and_(UrdfHasBaseLinkName.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
+                          UrdfHasBaseLinkName.neem_id == SomaIsPerformedBy.neem_id)
+                     )
+                 }
+        outer_join = {UrdfHasBaseLinkName: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_performer_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add base link name to the query,
+        Assumes SomaIsPerformedBy has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {PerformerBaseLinkName:
+                 and_(PerformerBaseLinkName.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
+                      PerformerBaseLinkName.neem_id == SomaIsPerformedBy.neem_id)
+                 }
+        outer_join = {PerformerBaseLinkName: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
+    def join_participant_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add base link name to the query,
+        Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        joins = {ParticipantBaseLinkName:
+                 and_(ParticipantBaseLinkName.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                      ParticipantBaseLinkName.neem_id == DulHasParticipant.neem_id)
+                 }
+        outer_join = {ParticipantBaseLinkName: is_outer}
+        self._update_joins_metadata(joins, outer_joins=outer_join)
+        return self
+
     def filter_tf_by_base_link(self) -> 'NeemQuery':
         """
         Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already.
         :return: the modified query.
         """
         return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
+
+    def filter_tf_by_base_link_name(self) -> 'NeemQuery':
+        """
+        Filter the tf data by URDF base link name. Assumes UrdfHasBaseLinkName has been joined/selected already.
+        :return: the modified query.
+        """
+        return self.filter(Tf.child_frame_id == UrdfHasBaseLinkName.o)
+
+    def filter_tf_by_performer_base_link_name(self) -> 'NeemQuery':
+        """
+        Filter the tf data by performer base link name. Assumes PerformerBaseLinkName has been joined/selected already.
+        :return: the modified query.
+        """
+        return self.filter(Tf.child_frame_id == PerformerBaseLinkName.o)
+
+    def filter_tf_by_participant_base_link_name(self) -> 'NeemQuery':
+        """
+        Filter the tf data by participant base link name. Assumes ParticipantBaseLinkName has been joined/selected already.
+        :return: the modified query.
+        """
+        return self.filter(Tf.child_frame_id == ParticipantBaseLinkName.o)
 
     def filter_tf_by_base_link_or_participant(self) -> 'NeemQuery':
         """
@@ -606,7 +676,7 @@ class NeemQuery:
         """
         return self.join_type(AgentType, Agent, Agent.dul_Entity_o, is_outer=is_outer)
 
-    def join_is_performed_by(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_task_is_performed_by(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join the is performed by table. Assumes DulExecutesTask has been joined/selected already.
         :param is_outer: whether to use outer join or not.
@@ -905,6 +975,30 @@ class NeemQuery:
         :return: the modified query.
         """
         self.update_selected_columns([SomaHasFilePath.o])
+        return self
+
+    def select_base_link_name(self) -> 'NeemQuery':
+        """
+        Select base link name column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([UrdfHasBaseLinkName.o])
+        return self
+
+    def select_performer_base_link_name(self) -> 'NeemQuery':
+        """
+        Select performer base link name column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([PerformerBaseLinkName.o])
+        return self
+
+    def select_participant_base_link_name(self) -> 'NeemQuery':
+        """
+        Select participant base link name column.
+        :return: the modified query.
+        """
+        self.update_selected_columns([ParticipantBaseLinkName.o])
         return self
 
     def order_by_stamp(self) -> 'NeemQuery':

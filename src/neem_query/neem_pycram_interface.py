@@ -95,6 +95,15 @@ class PyCRAMNEEMInterface(NeemInterface):
         super().__init__(db_url)
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
 
+    @classmethod
+    def from_pycram_neem_interface(cls, pycram_neem_interface: 'PyCRAMNEEMInterface'):
+        """
+        Create a new PyCRAM NEEM interface from an existing one.
+        :param pycram_neem_interface: the existing PyCRAM NEEM interface.
+        :return: the new PyCRAM NEEM interface.
+        """
+        return cls(pycram_neem_interface.engine.url.__str__())
+
     def redo_neem_plan(self):
         """
         Redo NEEM actions using PyCRAM. The query should contain:
@@ -131,7 +140,6 @@ class PyCRAMNEEMInterface(NeemInterface):
         tasks = self.get_result().get_tasks(unique=True)
         task = tasks[0]
         qr = self.get_result().filter_by_task([task])
-        print(qr.df)
         environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects(qr)
         participant_desig = list(participant_desigs.values())[0]
         grasp = qr.get_task_parameter_types()[0]
@@ -142,6 +150,29 @@ class PyCRAMNEEMInterface(NeemInterface):
         arms = [arm.name.lower() for arm in Arms]
         with simulated_robot():
             PickUpAction(participant_desig, arms, grasps).resolve().perform()
+
+    def get_pre_task_state(self, task: str, sql_neem_id: int):
+        """
+        Get the state of the world before the task.
+        :param task: the task to get the state before.
+        :param sql_neem_id: the sql id of the NEEM.
+        :return:
+        """
+        pni = PyCRAMNEEMInterface.from_pycram_neem_interface(self)
+        pni.query_neems_motion_replay_data(filter_tf_by_base_link=False)
+
+    @staticmethod
+    def get_performer_base_link(performer: str) -> str:
+        """
+        Get the base link of a performer.
+        :param performer: the performer to get the base link of.
+        :return: the base link of the performer.
+        """
+        if 'pr2' in performer.lower():
+            return 'pr2:base_link'
+        else:
+            logging.error(f'No base link found for performer {performer}')
+            raise ValueError(f'No base link found for performer {performer}')
 
     def get_and_spawn_neem_objects(self, query_result: Optional[QueryResult] = None) -> NEEMObjects:
         """

@@ -95,7 +95,7 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_join_is_performed_by(self):
         df = (self.nq.select_is_performed_by().select(Neem.ID).select_from_tasks().
-              join_neems().join_is_performed_by()).get_result().df
+              join_neems().join_task_is_performed_by()).get_result().df
         self.assertTrue(len(df) > 0)
 
     def test_join_object_mesh_path(self):
@@ -105,4 +105,15 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_get_unique_task_types(self):
         df = self.nq.select_task_type().select_from_tasks().join_task_types().distinct().get_result().df
+        self.assertTrue(len(df) > 0)
+
+    def test_base_link_name(self):
+        df = (self.nq.select_task().select_participant_base_link_name().select_participant().select_performer_base_link_name().
+              select_is_performed_by().select_tf_columns().
+              select_from_tasks().
+              join_task_participants().join_participant_base_link_name().
+              join_task_is_performed_by().join_performer_base_link_name().
+              join_task_time_interval().join_tf_on_time_interval()
+              ).get_result().df
+        print(df)
         self.assertTrue(len(df) > 0)

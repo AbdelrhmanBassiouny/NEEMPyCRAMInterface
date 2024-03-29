@@ -12,6 +12,8 @@ TaskParameterCategory = aliased(DulClassify, name='TaskParameterCategory')
 Agent = aliased(DulClassify, name='Agent')
 AgentType = aliased(RdfType, name='AgentType')
 IsPerformedByType = aliased(RdfType, name='IsPerformedByType')
+PerformerBaseLinkName = aliased(UrdfHasBaseLinkName, name='PerformerBaseLink')
+ParticipantBaseLinkName = aliased(UrdfHasBaseLinkName, name='ParticipantBaseLink')
 
 Initialized = None
 
@@ -51,6 +53,8 @@ class ColumnLabel(Enum):
     is_performed_by = "is_performed_by"
     is_performed_by_type = "is_performed_by_type"
     object_mesh_path = "object_mesh_path"
+    performer_base_link_name = "performer_base_link_name"
+    participant_base_link_name = "participant_base_link_name"
 
 
 column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
@@ -83,7 +87,9 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    AgentType.o: ColumnLabel.agent_type.value,
                    SomaIsPerformedBy.dul_Agent_o: ColumnLabel.is_performed_by.value,
                    IsPerformedByType.o: ColumnLabel.is_performed_by_type.value,
-                   SomaHasFilePath.o: ColumnLabel.object_mesh_path.value}
+                   SomaHasFilePath.o: ColumnLabel.object_mesh_path.value,
+                   PerformerBaseLinkName.o: ColumnLabel.performer_base_link_name.value,
+                   ParticipantBaseLinkName.o: ColumnLabel.participant_base_link_name.value}
 
 
 # loop over the attributes of all classes in the neems_database module,

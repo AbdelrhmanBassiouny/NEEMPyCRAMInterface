@@ -71,7 +71,7 @@ class NeemInterface(NeemQuery):
          select_is_performed_by().select_object_mesh_path().
          join_all_subtasks_data(is_outer=True).
          join_all_task_participants_data(is_outer=True).
-         join_all_task_parameter_data(is_outer=True).join_is_performed_by().join_object_mesh_path(is_outer=True))
+         join_all_task_parameter_data(is_outer=True).join_task_is_performed_by().join_object_mesh_path(is_outer=True))
         return self
 
     def query_task_sequence_of_neem(self, sql_neem_id: int) -> NeemQuery:
@@ -129,7 +129,7 @@ class NeemInterface(NeemQuery):
          join_task_participants(is_outer=True).
          join_participant_types(is_outer=True).
          join_object_mesh_path(is_outer=True).
-         join_is_performed_by().join_is_performed_by_type().
+         join_task_is_performed_by().join_is_performed_by_type().
          join_all_task_parameter_data(is_outer=outer_join_task_parameters).
          join_task_time_interval().
          join_neems().join_neems_environment().
@@ -137,25 +137,33 @@ class NeemInterface(NeemQuery):
          )
         return self
 
-    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = False) -> NeemQuery:
+    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = False,
+                                       filter_tf_by_base_link: Optional[bool] = True) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
+        :param filter_tf_by_base_link: whether to filter the TFs by the base link or not.
         :return: the query.
         """
         self.reset()
         (self.select_participant().select_participant_type().select_object_mesh_path().
+         select_is_performed_by().select_is_performed_by_type().
          select_tf_columns().select_tf_transform_columns().
          select_neem_id().
          select_environment().
          select_from_tasks().
          join_task_types().
          join_all_task_participants_data(is_outer=not participant_necessary).
+         join_object_mesh_path(is_outer=True).
          join_task_time_interval().
-         join_tf_on_time_interval().filter_tf_by_base_link().
+         join_tf_on_time_interval().
          join_tf_transfrom().
-         join_neems().join_neems_environment().
-         join_object_mesh_path(is_outer=True)
+         join_task_is_performed_by(is_outer=True).join_is_performed_by_type(is_outer=True).
+         join_neems().join_neems_environment()
          .order_by_stamp()
          )
+        if filter_tf_by_base_link:
+            self.filter_tf_by_base_link()
         return self
+
+
