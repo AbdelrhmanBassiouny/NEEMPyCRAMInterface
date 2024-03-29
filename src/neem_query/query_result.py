@@ -29,6 +29,14 @@ class QueryResult:
         """
         return self.filter_dataframe({CL.neem_id.value: neem_ids})
 
+    def filter_by_sql_neem_id(self, neem_ids: List[int]) -> 'QueryResult':
+        """
+        Get the data of certain NEEMs from the query result DataFrame
+        :param neem_ids: the NEEM IDs.
+        :return: the data of the NEEMs.
+        """
+        return self.filter_dataframe({CL.neem_sql_id.value: neem_ids})
+
     def filter_by_participant_type(self, participant_types: List[str]) -> 'QueryResult':
         """
         Get the data of a certain participant type from the query result DataFrame.
@@ -116,14 +124,6 @@ class QueryResult:
         :return: the data of the agent types.
         """
         return self.filter_dataframe({CL.agent_type.value: agent_types})
-
-    def filter_by_sql_neem_id(self, neem_ids: List[int]) -> 'QueryResult':
-        """
-        Get the data of certain NEEMs from the query result DataFrame
-        :param neem_ids: the NEEM IDs.
-        :return: the data of the NEEMs.
-        """
-        return self.filter_dataframe({CL.neem_sql_id.value: neem_ids})
 
     def filter_dataframe(self, filters: dict) -> 'QueryResult':
         """
@@ -216,11 +216,12 @@ class QueryResult:
         :param drop_na: whether to drop None values or not.
         :return: the entities in each NEEM.
         """
-        neem_ids = self.get_sql_neem_ids(unique=True)
+        sql_neem_ids = self.get_sql_neem_ids(unique=True)
         entities_per_neem = []
-        for neem_id in neem_ids:
-            entities = self.filter_by_neem_id([neem_id]).get_column_values(entity, unique=unique, drop_na=drop_na)
-            entities_per_neem.extend([(neem_id, neem_entity) for neem_entity in entities])
+        for sql_neem_id in sql_neem_ids:
+            entities = (self.filter_by_sql_neem_id([sql_neem_id]).
+                        get_column_values(entity, unique=unique, drop_na=drop_na))
+            entities_per_neem.extend([(sql_neem_id, neem_entity) for neem_entity in entities])
         return entities_per_neem
 
     def get_participants(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:

@@ -123,11 +123,12 @@ class NeemInterface(NeemQuery):
         self.reset()
         (self.select_neem_id().select_sql_neem_id().select_task().select_task_type().select_participant().
          select_participant_type().select_environment().select_is_performed_by().select_is_performed_by_type()
-         .select_parameter_type().
+         .select_parameter_type().select_object_mesh_path().
          select_from_tasks().
          join_task_types().filter_by_task_types(tasks, regexp=regexp).
          join_task_participants(is_outer=True).
          join_participant_types(is_outer=True).
+         join_object_mesh_path(is_outer=True).
          join_is_performed_by().join_is_performed_by_type().
          join_all_task_parameter_data(is_outer=outer_join_task_parameters).
          join_task_time_interval().

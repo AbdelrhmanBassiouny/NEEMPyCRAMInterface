@@ -13,6 +13,7 @@ from pycram.datastructures.pose import Pose, Transform
 from pycram.designators import action_designator
 from pycram.designators.action_designator import PickUpAction
 from pycram.designators.object_designator import BelieveObject
+from pycram.process_module import simulated_robot
 from pycram.world import World
 from pycram.world_concepts.world_object import Object
 from .enums import ColumnLabel as CL
@@ -30,7 +31,6 @@ class ReplayNEEMMotionData:
     poses: List[Pose]
     times: List[float]
     participant_instances: List[str]
-    neem_ids: List[str]
 
 
 @dataclass
@@ -51,8 +51,8 @@ class NEEMObjects:
     A data class to hold the pycram objects in the NEEM.
     """
     environment: Object
-    participants: Dict[NEEMObjectMetadata, Object]
-    performers: Dict[NEEMObjectMetadata, Object]
+    participants: Dict[str, Object]
+    performers: Dict[str, Object]
 
 
 class PyCRAMNEEMInterface(NeemInterface):
@@ -103,11 +103,11 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
         agent_objects = self.get_and_spawn_performers()
-        tasks = self.query_result.get_column_value_per_neem(CL.task_type.value)
+        tasks = self.get_result().get_column_value_per_neem(CL.task_type.value)
         for neem_id, participant, task, parameters, current_time in zip(self.get_neem_ids(unique=False),
                                                                         self.get_participants(unique=False),
                                                                         tasks,
-                                                                        self.query_result.get_column_value_per_neem(
+                                                                        self.get_result().get_column_value_per_neem(
                                                                             CL.task_parameter.value),
                                                                         self.get_stamp()):
             # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
@@ -128,21 +128,22 @@ class PyCRAMNEEMInterface(NeemInterface):
          neem_id, action, participant, performed_by.
         """
         self.query_pick_actions(sql_neem_id)
-        tasks = self.query_result.get_tasks(unique=True)
+        tasks = self.get_result().get_tasks(unique=True)
         task = tasks[0]
-        qr = self.query_result.filter_by_task([task])
+        qr = self.get_result().filter_by_task([task])
         print(qr.df)
         environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects(qr)
         participant_desig = list(participant_desigs.values())[0]
         grasp = qr.get_task_parameter_types()[0]
         if grasp in self.soma_to_pycram_grasps:
-            grasps = [self.soma_to_pycram_grasps[grasp]]
+            grasps = [self.soma_to_pycram_grasps[grasp].name.lower()]
         else:
             grasps = [g.name.lower() for g in Grasp]
         arms = [arm.name.lower() for arm in Arms]
-        PickUpAction(participant_desig, arms, grasps).resolve().perform()
+        with simulated_robot():
+            PickUpAction(participant_desig, arms, grasps).resolve().perform()
 
-    def get_and_spawn_neem_objects(self, query_result: QueryResult) -> NEEMObjects:
+    def get_and_spawn_neem_objects(self, query_result: Optional[QueryResult] = None) -> NEEMObjects:
         """
         Get and spawn the objects in the NEEM using PyCRAM.
         :param query_result: the query result to get the objects from.
@@ -153,17 +154,17 @@ class PyCRAMNEEMInterface(NeemInterface):
         return NEEMObjects(environment_obj, participant_objects, performer_objects)
 
     def get_designators_for_neem_objects(self, query_result: QueryResult) -> \
-            Tuple[BelieveObject, Dict[NEEMObjectMetadata, BelieveObject], Dict[NEEMObjectMetadata, BelieveObject]]:
+            Tuple[BelieveObject, Dict[str, BelieveObject], Dict[str, BelieveObject]]:
         """
         Get the designators for the objects in the NEEM.
         :param query_result: the query result to get the objects from.
         """
         neem_objects = self.get_and_spawn_neem_objects(query_result)
         environment_desig = BelieveObject(names=[neem_objects.environment.name])
-        participant_desigs = {metadata: BelieveObject(names=[object_.name])
-                              for metadata, object_ in neem_objects.participants.items()}
-        performer_desigs = {metadata: BelieveObject(names=[object_.name])
-                            for metadata, object_ in neem_objects.performers.items()}
+        participant_desigs = {name: BelieveObject(names=[object_.name])
+                              for name, object_ in neem_objects.participants.items()}
+        performer_desigs = {name: BelieveObject(names=[object_.name])
+                             for name, object_ in neem_objects.performers.items()}
         return environment_desig, participant_desigs, performer_desigs
 
     def query_pick_actions(self, neem_id: Optional[int] = None) -> NeemQuery:
@@ -178,43 +179,43 @@ class PyCRAMNEEMInterface(NeemInterface):
             self.filter_by_sql_neem_id([neem_id])
         return self
 
-    def replay_neem_motions(self):
+    def replay_neem_motions(self, query_result: Optional[QueryResult] = None):
         """
         Replay NEEMs using PyCRAM. The query should contain:
-         neem_id, environment, participant, translation, orientation, stamp.
+         environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         """
 
-        environment_obj, participant_objects = self.get_and_spawn_environment_and_participants()
+        environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
 
-        motion_data = self.get_motion_data()
+        motion_data = self.get_motion_data(query_result)
         poses = motion_data.poses
         times = motion_data.times
         participant_instances = motion_data.participant_instances
-        neem_ids = motion_data.neem_ids
 
         prev_time = 0
-        for neem_id, participant, pose, current_time in zip(neem_ids, participant_instances, poses, times):
+        for participant, pose, current_time in zip(participant_instances, poses, times):
             if prev_time > 0:
                 wait_time = current_time - prev_time
                 if wait_time > 1:
                     wait_time = 1
                 time.sleep(wait_time)
             prev_time = current_time
-            participant_objects[NEEMObjectMetadata(neem_id, participant)].set_pose(pose)
+            participant_objects[participant].set_pose(pose)
 
-    def get_motion_data(self):
+    def get_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
         Get motion data required to replay motions from the query result.
+        :param query_result: the query result to get the motion data from.
         """
-        poses = self.get_poses()
-        times = self.get_stamp()
-        participant_instances = self.get_participants(unique=False)
-        neem_ids = self.get_neem_ids(unique=False)
-        return ReplayNEEMMotionData(poses, times, participant_instances, neem_ids)
+        query_result = query_result if query_result is not None else self.get_result()
+        poses = self.get_poses(query_result)
+        times = self.get_stamp(query_result)
+        participant_instances = self.get_participants(query_result=query_result, unique=False)
+        return ReplayNEEMMotionData(poses, times, participant_instances)
 
-    def get_and_spawn_environment_and_participants(self, query_result: QueryResult)\
-            -> Tuple[Object, Dict[NEEMObjectMetadata, Object]]:
+    def get_and_spawn_environment_and_participants(self, query_result: Optional[QueryResult] = None)\
+            -> Tuple[Object, Dict[str, Object]]:
         """
         Get and spawn the environment and participants in the NEEM using PyCRAM.
         :param query_result: the query result to get the environment and participants from.
@@ -224,68 +225,69 @@ class PyCRAMNEEMInterface(NeemInterface):
         participant_objects = self.get_and_spawn_participants(query_result)
         return environment_obj, participant_objects
 
-    def get_and_spawn_environment(self, query_result: QueryResult) -> Object:
+    def get_and_spawn_environment(self, query_result: Optional[QueryResult] = None) -> Object:
         """
         Get and spawn the environment in the NEEM using PyCRAM.
         :param query_result: the query result to get the environment from.
         :return: the environment as a PyCRAM object.
         """
+        query_result = query_result if query_result is not None else self.get_result()
         environments = query_result.get_environments()
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
 
-    def get_and_spawn_performers(self, query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
+    def get_and_spawn_performers(self, query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
         Get and spawn the agents in the NEEM using PyCRAM.
         :param query_result: the query result to get the agents from.
-        :return: the agents as a dictionary of PyCRAM objects.
+        :return: A dictionary of agents as PyCRAM objects.
         """
         return self.get_and_spawn_entities(CL.is_performed_by.value,
                                            lambda agent, _: self.get_description_of_performer(agent),
                                            lambda _: ObjectType.ROBOT,
                                            query_result)
 
-    def get_and_spawn_participants(self, query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
+    def get_and_spawn_participants(self, query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
         Get and spawn the participants in the NEEM using PyCRAM.
         :param query_result: the query result to get the participants from.
-        :return: the participants as a dictionary of PyCRAM objects.
+        :return: A dictionary of participants as PyCRAM objects.
         """
         return self.get_and_spawn_entities(CL.participant.value,
                                            self.get_description_of_participant,
                                            self.get_object_type,
                                            query_result)
 
-    @staticmethod
-    def get_and_spawn_entities(entity_column_name: str,
-                               description_getter: Callable[[str, str], str],
+    def get_and_spawn_entities(self,
+                               entity_column_name: str,
+                               description_getter: Callable[[str, QueryResult], str],
                                object_type_getter: Callable[[str], ObjectType],
-                               query_result: QueryResult) -> Dict[NEEMObjectMetadata, Object]:
+                               query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
         :param entity_column_name: the entity to get and spawn.
         :param description_getter: the function to get the description of the entity.
         :param object_type_getter: the function to get the type of the entity.
         :param query_result: the query result to get the entities from.
-        :return: the entities as a dictionary of PyCRAM objects.
+        :return: A dictionary of entities as PyCRAM objects.
         """
-        entities = query_result.get_column_value_per_neem(entity_column_name)
+        query_result = query_result if query_result is not None else self.get_result()
+        entities = query_result.get_column_values(entity_column_name)
         entity_objects = {}
-        neem_entities = []
-        for neem, neem_entity in entities:
+        for entity in entities:
             try:
-                description = description_getter(neem_entity, neem)
+                description = description_getter(entity, query_result)
             except ValueError as e:
-                logging.warning(f'Error getting description for entity {neem_entity}: {e}')
+                rospy.logwarn(f'Error getting description for entity {entity}: {e}')
                 continue
-            neem_entity_name = neem_entity
-            if ':' in neem_entity_name:
-                neem_entity_name = neem_entity_name.split(':')[-1]
-            if neem_entity in neem_entities:
-                neem_entity_name = f'{neem_entity}_{neem}'
-            entity_object = Object(neem_entity_name, object_type_getter(neem_entity), description)
-            entity_objects[NEEMObjectMetadata(neem, neem_entity)] = entity_object
-            neem_entities.append(neem_entity)
+            entity_name = entity
+            if ':' in entity_name:
+                entity_name = entity_name.split(':')[-1]
+            object_names = World.current_world.get_object_names()
+            if entity in object_names:
+                entity_name = f'{entity}_{object_names.count(entity)}'
+            entity_object = Object(entity_name, object_type_getter(entity), description)
+            entity_objects[entity] = entity_object
         return entity_objects
 
     @staticmethod
@@ -313,24 +315,26 @@ class PyCRAMNEEMInterface(NeemInterface):
             logging.debug(f'No description found for agent {agent}')
             raise ValueError(f'No description found for agent {agent}')
 
-    def get_and_download_mesh_of_participant(self, participant: str, neem_id: str) -> Union[str, None]:
+    def get_and_download_mesh_of_participant(self, participant: str,
+                                             query_result: Optional[QueryResult] = None) -> Union[str, None]:
         """
         Get the mesh of a participant and download it.
         :param participant: the participant to get the mesh of.
-        :param neem_id: the id of the NEEM.
+        :param query_result: the query result to get the mesh from.
         :return: the download path of the mesh file.
         """
-        mesh_link = self.get_mesh_link_of_object_in_neem(neem_id, participant)
+        mesh_link = self.get_mesh_link_of_object_in_neem(participant, query_result)
         if mesh_link is not None:
             download_path = self.download_mesh_file(mesh_link)
             if download_path is not None:
                 return download_path
 
-    def get_description_of_participant(self, participant: str, neem_id: str) -> Union[str, None]:
+    def get_description_of_participant(self, participant: str,
+                                       query_result: Optional[QueryResult] = None) -> Union[str, None]:
         """
         Get the description of a participant.
         :param participant: the participant to get the description of.
-        :param neem_id: the id of the NEEM.
+        :param query_result: the query result to get the description from.
         :return: the description of the participant.
         """
         participant_name_candidates = self._filter_participant_name(participant)
@@ -342,7 +346,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         if file_path is not None:
             return file_path
 
-        download_path = self.get_and_download_mesh_of_participant(participant, neem_id)
+        download_path = self.get_and_download_mesh_of_participant(participant, query_result)
         if download_path is not None:
             return download_path
 
@@ -446,16 +450,17 @@ class PyCRAMNEEMInterface(NeemInterface):
             download_path = self.download_mesh_file(file_names[0])
             return download_path
 
-    def get_mesh_link_of_object_in_neem(self, neem_id: str, object_name: str) -> Union[str, None]:
+    def get_mesh_link_of_object_in_neem(self, object_name: str,
+                                        query_result: Optional[QueryResult] = None) -> Union[str, None]:
         """
         Get the mesh link of an object in a NEEM.
-        :param neem_id: The id of the NEEM.
         :param object_name: The name of the object.
+        :param query_result: The query result to get the mesh link from.
         :return: The mesh link of the object.
         """
-        mesh_path_df = self.query_result.filter_by_participant([object_name]).filter_by_neem_id([neem_id]).df
+        query_result = query_result if query_result is not None else self.get_result()
+        mesh_path_df = query_result.filter_by_participant([object_name]).df
         mesh_path_df = mesh_path_df.dropna(subset=[CL.object_mesh_path.value]).drop_duplicates()
-        print(mesh_path_df)
         mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
         if mesh_path is None:
             return None
@@ -509,12 +514,12 @@ class PyCRAMNEEMInterface(NeemInterface):
         else:
             return ObjectType.GENERIC_OBJECT
 
-    def get_transforms(self) -> List[Transform]:
+    def get_transforms(self, query_result: Optional[QueryResult] = None) -> List[Transform]:
         """
         Get transforms from the query result.
         :return: the transforms as a list.
         """
-        query_result = self.get_result()
+        query_result = query_result if query_result is not None else self.get_result()
         position = query_result.get_positions()
         orientation = query_result.get_orientations()
         frame_id = query_result.get_frame_id()
@@ -524,52 +529,56 @@ class PyCRAMNEEMInterface(NeemInterface):
                       zip(*position, *orientation, frame_id, child_frame_id)]
         return transforms
 
-    def get_poses(self) -> List[Pose]:
+    def get_poses(self, query_result: Optional[QueryResult] = None) -> List[Pose]:
         """
         Get poses from the query result.
+        :param query_result: the query result to get the poses from.
         :return: the poses as a list.
         """
-        positions = self.query_result.get_positions()
-        orientations = self.query_result.get_orientations()
+        query_result = query_result if query_result is not None else self.get_result()
+        positions = query_result.get_positions()
+        orientations = query_result.get_orientations()
         poses = [Pose([x, y, z], [rx, ry, rz, rw])
                  for x, y, z, rx, ry, rz, rw in zip(*positions, *orientations)]
         return poses
 
-    def get_stamp(self) -> List[float]:
+    def get_stamp(self, query_result: Optional[QueryResult] = None) -> List[float]:
         """
         Get times from the query result DataFrame.
+        :param query_result: the query result to get the times from.
         :return: the time stamps as a list.
         """
-        return self.query_result.get_stamp()
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_stamp()
 
-    def get_participants(self, unique: Optional[bool] = True) -> List[str]:
+    def get_participants(self, unique: Optional[bool] = True,
+                         query_result: Optional[QueryResult] = None) -> List[str]:
         """
         Get the participants in the query result DataFrame.
         :param unique: whether to return unique participants or not.
+        :param query_result: the query result to get the participants from.
         :return: the participants in the NEEM.
         """
-        return self.query_result.get_participants(unique)
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_participants(unique)
 
-    def get_participant_types(self, unique: Optional[bool] = True) -> List[str]:
+    def get_participant_types(self, unique: Optional[bool] = True,
+                              query_result: Optional[QueryResult] = None) -> List[str]:
         """
         Get the participant_types in the query result DataFrame.
         :param unique: whether to return unique participant_types or not.
+        :param query_result: the query result to get the participant_types from.
         :return: the participant_types in the NEEM.
         """
-        return self.query_result.get_participant_types(unique)
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_participant_types(unique)
 
-    def get_neem_ids(self, unique: Optional[bool] = True) -> List[str]:
+    def get_neem_ids(self, unique: Optional[bool] = True, query_result: Optional[QueryResult] = None) -> List[str]:
         """
         Get the NEEM IDs in the query result DataFrame.
         :param unique: whether to return unique NEEM IDs or not.
+        :param query_result: the query result to get the NEEM IDs from.
         :return: the NEEM IDs in the NEEM.
         """
-        return self.query_result.get_neem_ids(unique)
-
-    @property
-    def query_result(self) -> QueryResult:
-        """
-        Get the query result.
-        :return: the query result.
-        """
-        return self.get_result()
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_neem_ids(unique)
