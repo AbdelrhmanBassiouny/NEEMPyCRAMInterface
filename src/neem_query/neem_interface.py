@@ -148,7 +148,7 @@ class NeemInterface(NeemQuery):
         self.reset()
         (self.select_participant().select_participant_type().select_object_mesh_path().
          select_is_performed_by().select_is_performed_by_type().
-         select_tf_columns().select_tf_transform_columns().
+         select_tf_columns().select_tf_header_columns().select_tf_transform_columns().
          select_neem_id().
          select_environment().
          select_from_tasks().
@@ -156,7 +156,7 @@ class NeemInterface(NeemQuery):
          join_all_task_participants_data(is_outer=not participant_necessary).
          join_object_mesh_path(is_outer=True).
          join_task_time_interval().
-         join_tf_on_time_interval().
+         join_tf_on_time_interval().join_tf_header_on_tf().
          join_tf_transfrom().
          join_task_is_performed_by(is_outer=True).join_is_performed_by_type(is_outer=True).
          join_neems().join_neems_environment()

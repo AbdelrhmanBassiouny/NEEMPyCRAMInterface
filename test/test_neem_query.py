@@ -1,10 +1,12 @@
 from unittest import TestCase
 
 import pandas as pd
+from sqlalchemy import between, and_, func, not_
 
-from neem_query import NeemQuery, TaskType, ParticipantType
+from neem_query import NeemQuery
 from neem_query.neems_database import *
-from neem_query.enums import ColumnLabel as CL
+from neem_query.enums import ColumnLabel as CL, PerformerBaseLinkName, PerformerTfHeader, PerformerTf, \
+    ParticipantBaseLinkName, ParticipantBaseLink
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -54,7 +56,7 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_multi_join(self):
         df = (self.nq.select_stamp().select_participant_type().
-              select_tf_columns().
+              select_tf_columns().select_tf_header_columns().
               select_tf_transform_columns().
               select_from_tasks().
               join_task_types().
@@ -62,7 +64,7 @@ class TestNeemSqlAlchemy(TestCase):
               join_participant_types().
               join_participant_base_link().
               join_task_time_interval().
-              join_tf_on_time_interval().
+              join_tf_on_time_interval().join_tf_header_on_tf().
               join_tf_transfrom().join_neems().join_neems_environment().
               filter_tf_by_base_link().
               filter_by_task_types("Pour", regexp=True).order_by_stamp()).get_result().df
@@ -100,20 +102,116 @@ class TestNeemSqlAlchemy(TestCase):
 
     def test_join_object_mesh_path(self):
         df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
-              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value:[5]}).df
+              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value: [5]}).df
         self.assertTrue(len(df) > 0)
 
     def test_get_unique_task_types(self):
         df = self.nq.select_task_type().select_from_tasks().join_task_types().distinct().get_result().df
         self.assertTrue(len(df) > 0)
 
+    def test_performer_base_link_name_with_tf(self):
+        df = (self.nq.select_is_performed_by().select_performer_tf_columns().select_sql_neem_id().
+              select_from(SomaIsPerformedBy).
+              join_performer_base_link_name().join_neems()
+              .join_performer_tf_on_base_link_name()
+              .limit(100)
+              ).get_result().df
+        print(df)
+        self.assertTrue(len(df) > 0)
+
+    def test_participant_base_link_name_with_tf(self):
+        df = (self.nq.select_participant().select_participant_tf_columns().select_sql_neem_id().
+              select_from(DulHasParticipant).
+              join_participant_base_link_name().join_neems()
+              .join_participant_tf_on_base_link_name()
+              .limit(100)
+              ).get_result().df
+        print(df)
+        self.assertTrue(len(df) > 0)
+
     def test_base_link_name(self):
-        df = (self.nq.select_task().select_participant_base_link_name().select_participant().select_performer_base_link_name().
-              select_is_performed_by().select_tf_columns().
-              select_from_tasks().
-              join_task_participants().join_participant_base_link_name().
-              join_task_is_performed_by().join_performer_base_link_name().
-              join_task_time_interval().join_tf_on_time_interval()
+        df = (self.nq.select_task()
+              .select_from_tasks()
+              .join_task_time_interval()
+
+              ###################
+              # NEEM Data
+              ###################
+              .select_sql_neem_id()
+              .join_neems()
+              .filter(not_(Neem.description.like("%VR%")))
+
+
+              ###################
+              # Participants Data
+              ###################
+              .select_participant()
+              .join_task_participants()
+              .select_participant_tf_columns()
+
+              # Base Link
+              # .select_participant_base_link()
+              # .join_participant_base_link(is_outer=False)
+              # .join_participant_tf_on_base_link()
+
+              # Base Link Name
+              .select_participant_base_link_name()
+              .join_participant_base_link_name()
+              .join_participant_tf_on_base_link_name()
+
+              # Time Interval
+              # .join_participant_tf_on_time_interval(begin_offset=0)
+
+              .select_participant_tf_header_columns()
+              .join_participant_tf_header_on_tf()
+
+              .select_participant_tf_transform_columns()
+              .join_participant_tf_transform()
+
+              ###################
+              # Performers Data
+              ###################
+              .select_is_performed_by()
+              .join_task_is_performed_by()
+              # .filter(SomaIsPerformedBy.dul_Agent_o.like("%pr2%"))
+              .select_performer_tf_columns()
+
+              # Base Link
+              # .select_performer_base_link()
+              # .join_performer_base_link()
+              # .join_performer_tf_on_base_link()
+
+              # Base Link Name
+              .select_performer_base_link_name()
+              .join_performer_base_link_name()
+              .join_performer_tf_on_base_link_name()
+
+              # Time Interval
+              # .join_performer_tf_on_time_interval(begin_offset=0)
+
+              .select_performer_tf_header_columns()
+              .join_performer_tf_header_on_tf()
+
+              .select_performer_tf_transform_columns()
+              .join_performer_tf_transform()
+
+              ###################
+              # TF Data
+              ###################
+              # .select_tf_columns()
+
+              # .join_tf_on_time_interval(begin_offset=-40)
+              # .filter_tf_by_base_link()
+
+              # .join_tf_on_participant()
+
+              # .select_tf_header_columns()
+              # .join_tf_header_on_tf()
+
+              # .select_tf_transfrom_columns()
+              # .join_tf_transfrom()
+
+              .limit(100)
               ).get_result().df
         print(df)
         self.assertTrue(len(df) > 0)

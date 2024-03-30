@@ -99,11 +99,11 @@ class TestNeemInterface(TestCase):
         self.assertTrue(len(df) > 0)
 
     def test_get_abhijit_pouring_tfs(self):
-        (self.ni.select_tf_columns().select(Neem.created_by).select_participant_type().select_task_type().
+        (self.ni.select_tf_columns().select_tf_header_columns().select(Neem.created_by).select_participant_type().select_task_type().
          select_tf_transform_columns().
          select_from_tasks().
          join_task_time_interval().
-         join_tf_on_time_interval(begin_offset=0).join_tf_transfrom().
+         join_tf_on_time_interval(begin_offset=0).join_tf_header_on_tf().join_tf_transfrom().
          join_task_types().filter_by_task_types(['Pour'], regexp=True).
          join_all_task_participants_data().filter_tf_by_base_link().
          join_neems().
