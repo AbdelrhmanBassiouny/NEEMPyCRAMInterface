@@ -1453,24 +1453,36 @@ class NeemQuery:
         """
         return self.filter_by_type(TaskType, tasks, regexp)
 
-    def filter_by_participant_type(self, participants: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
+    def filter_by_participant_type(self, participants: List[str], regexp: Optional[bool] = False,
+                                   negate: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by participant type.
         :param participants: the participant types.
         :param regexp: whether to use regex to filter the participant type or not (will use the sql like operator).
+        :param negate: whether to negate the filter or not.
         :return: the modified query.
         """
-        return self.filter_by_type(ParticipantType, participants, regexp)
+        return self.filter_by_type(ParticipantType, participants, regexp=regexp, negate=negate)
 
-    def filter_by_type(self, type_table: Type[RdfType], types: List[str],
-                       regexp: Optional[bool] = False,
-                       use_not_: Optional[bool] = False) -> 'NeemQuery':
+    def filter_by_performer_type(self, performers: List[str], regexp: Optional[bool] = False,
+                                 negate: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Filter the query by performer type.
+        :param performers: the performer types.
+        :param regexp: whether to use regex to filter the performer type or not (will use the sql like operator).
+        :param negate: whether to negate the filter or not.
+        :return: the modified query.
+        """
+        return self.filter_by_type(IsPerformedByType, performers, regexp=regexp, negate=negate)
+
+    def filter_by_type(self, type_table: Type[RdfType], types: List[str], regexp: Optional[bool] = False,
+                       negate: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by type.
         :param type_table: the type table.
         :param types: the types.
         :param regexp: whether to use regex to filter the type or not (will use the sql like operator).
-        :param use_not_: whether to negate the filter or not.
+        :param negate: whether to negate the filter or not.
         :return: the modified query.
         """
         if regexp:
@@ -1478,7 +1490,7 @@ class NeemQuery:
         else:
             cond = [type_table.o == t for t in types]
         cond = or_(*cond)
-        if use_not_:
+        if negate:
             cond = not_(cond)
         self.filters.append(cond)
         return self

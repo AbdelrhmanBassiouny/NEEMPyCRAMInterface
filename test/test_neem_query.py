@@ -6,7 +6,7 @@ from sqlalchemy import between, and_, func, not_
 from neem_query import NeemQuery
 from neem_query.neems_database import *
 from neem_query.enums import ColumnLabel as CL, PerformerBaseLinkName, PerformerTfHeader, PerformerTf, \
-    ParticipantBaseLinkName, ParticipantBaseLink
+    ParticipantBaseLinkName, ParticipantBaseLink, IsPerformedByType
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -137,10 +137,10 @@ class TestNeemSqlAlchemy(TestCase):
               ###################
               # NEEM Data
               ###################
-              .select_sql_neem_id()
-              .join_neems()
-              .filter(not_(Neem.description.like("%VR%")))
-
+              # .select_sql_neem_id()
+              # .join_neems()
+              # .filter(not_(Neem.description.like("%VR%")))
+              # .filter(Neem.description.like("%VR%"))
 
               ###################
               # Participants Data
@@ -150,14 +150,14 @@ class TestNeemSqlAlchemy(TestCase):
               .select_participant_tf_columns()
 
               # Base Link
-              # .select_participant_base_link()
-              # .join_participant_base_link(is_outer=False)
-              # .join_participant_tf_on_base_link()
+              .select_participant_base_link()
+              .join_participant_base_link()
+              .join_participant_tf_on_base_link()
 
               # Base Link Name
-              .select_participant_base_link_name()
-              .join_participant_base_link_name()
-              .join_participant_tf_on_base_link_name()
+              # .select_participant_base_link_name()
+              # .join_participant_base_link_name()
+              # .join_participant_tf_on_base_link_name()
 
               # Time Interval
               # .join_participant_tf_on_time_interval(begin_offset=0)
@@ -174,7 +174,12 @@ class TestNeemSqlAlchemy(TestCase):
               .select_is_performed_by()
               .join_task_is_performed_by()
               # .filter(SomaIsPerformedBy.dul_Agent_o.like("%pr2%"))
-              .select_performer_tf_columns()
+
+              .select_is_performed_by_type()
+              .join_is_performed_by_type()
+              .filter_by_performer_type(["Natural"], regexp=True)
+
+              # .select_performer_tf_columns()
 
               # Base Link
               # .select_performer_base_link()
@@ -182,18 +187,18 @@ class TestNeemSqlAlchemy(TestCase):
               # .join_performer_tf_on_base_link()
 
               # Base Link Name
-              .select_performer_base_link_name()
-              .join_performer_base_link_name()
-              .join_performer_tf_on_base_link_name()
+              # .select_performer_base_link_name()
+              # .join_performer_base_link_name()
+              # .join_performer_tf_on_base_link_name()
 
               # Time Interval
               # .join_performer_tf_on_time_interval(begin_offset=0)
 
-              .select_performer_tf_header_columns()
-              .join_performer_tf_header_on_tf()
+              # .select_performer_tf_header_columns()
+              # .join_performer_tf_header_on_tf()
 
-              .select_performer_tf_transform_columns()
-              .join_performer_tf_transform()
+              # .select_performer_tf_transform_columns()
+              # .join_performer_tf_transform()
 
               ###################
               # TF Data
