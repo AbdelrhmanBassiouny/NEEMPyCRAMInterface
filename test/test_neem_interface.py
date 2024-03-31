@@ -103,9 +103,9 @@ class TestNeemInterface(TestCase):
          select_tf_transform_columns().
          select_from_tasks().
          join_task_time_interval().
-         join_tf_on_time_interval(begin_offset=0).join_tf_header_on_tf().join_tf_transfrom().
+         join_tf_header_on_time_interval(begin_offset=0).join_tf_header_on_tf().join_tf_transfrom().
          join_task_types().filter_by_task_types(['Pour'], regexp=True).
-         join_all_task_participants_data().filter_tf_by_base_link().
+         join_all_task_participants_data().filter_tf_by_participant_base_link().
          join_neems().
          filter(Neem.created_by.in_(['Abhijit Vyas','Abhijit'])).
          limit(100)

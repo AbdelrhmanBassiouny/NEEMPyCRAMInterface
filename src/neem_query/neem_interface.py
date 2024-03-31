@@ -156,14 +156,14 @@ class NeemInterface(NeemQuery):
          join_all_task_participants_data(is_outer=not participant_necessary).
          join_object_mesh_path(is_outer=True).
          join_task_time_interval().
-         join_tf_on_time_interval().join_tf_header_on_tf().
+         join_tf_header_on_time_interval().join_tf_header_on_tf().
          join_tf_transfrom().
          join_task_is_performed_by(is_outer=True).join_is_performed_by_type(is_outer=True).
          join_neems().join_neems_environment()
          .order_by_stamp()
          )
         if filter_tf_by_base_link:
-            self.filter_tf_by_base_link()
+            self.filter_tf_by_participant_base_link()
         return self
 
 

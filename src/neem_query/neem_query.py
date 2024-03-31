@@ -444,8 +444,8 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
-    def join_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
+    def join_tf_header_on_time_interval(self, begin_offset: Optional[float] = -40,
+                                        end_offset: Optional[float] = 0) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
@@ -455,9 +455,18 @@ class NeemQuery:
         """
         joins = {TfHeader: between(TfHeader.stamp,
                                    SomaHasIntervalBegin.o + begin_offset,
-                                   SomaHasIntervalEnd.o + end_offset),
-                 Tf: and_(Tf.header == TfHeader.ID,
-                          Tf.neem_id == SomaHasIntervalBegin.neem_id), }
+                                   SomaHasIntervalEnd.o + end_offset)}
+        self.update_joins(joins)
+        return self
+
+    def join_tf_on_tf_header_and_time_interval_neem_id(self) -> 'NeemQuery':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes TfHeader and SomaHasIntervalBegin have been joined/selected already.
+        :return: the modified query.
+        """
+        joins = {Tf: and_(Tf.header == TfHeader.ID,
+                          Tf.neem_id == SomaHasIntervalBegin.neem_id)}
         self.update_joins(joins)
         return self
 
@@ -736,12 +745,12 @@ class NeemQuery:
         self.update_joins(joins)
         return self
 
-    def filter_tf_by_base_link(self) -> 'NeemQuery':
+    def filter_tf_by_participant_base_link(self) -> 'NeemQuery':
         """
-        Filter the tf data by base link. Assumes UrdfHasBaseLink has been joined/selected already.
+        Filter the tf data by base link. Assumes ParticipantBaseLink has been joined/selected already.
         :return: the modified query.
         """
-        return self.filter(Tf.child_frame_id == func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1))
+        return self.filter(Tf.child_frame_id == func.substring_index(ParticipantBaseLink.urdf_Link_o, ':', -1))
 
     def filter_tf_by_base_link_name(self) -> 'NeemQuery':
         """
@@ -1391,8 +1400,8 @@ class NeemQuery:
         for table, on in joins.items():
             if table in self.joins:
                 if on != self.joins[table]:
-                    logging.error(f"Table {Table} has been joined before on a different condition")
-                    raise ValueError(f"Table {Table} has been joined before on a different condition")
+                    logging.error(f"Table {table} has been joined before on a different condition")
+                    raise ValueError(f"Table {table} has been joined before on a different condition")
                 else:
                     continue
             else:

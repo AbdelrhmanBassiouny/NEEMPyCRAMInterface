@@ -51,18 +51,21 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(len(df) < len(outer_df))
 
     def test_multi_join(self):
-        df = (self.nq.select_stamp().select_participant_type().
-              select_tf_columns().select_tf_header_columns().
-              select_tf_transform_columns().
-              select_from_tasks().
+        df = (self.nq.select_stamp().select_participant_type()
+              .select_tf_header_columns()
+              .select_tf_columns()
+              .select_tf_transform_columns()
+              .select_from_tasks().
               join_task_types().
               join_task_participants().
               join_participant_types().
               join_participant_base_link().
               join_task_time_interval().
-              join_tf_on_time_interval().join_tf_header_on_tf().
-              join_tf_transfrom().join_neems().join_neems_environment().
-              filter_tf_by_base_link().
+              join_tf_header_on_time_interval()
+              .join_tf_on_tf_header_and_time_interval_neem_id()
+              .join_tf_transfrom()
+              .join_neems().join_neems_environment().
+              filter_tf_by_participant_base_link().
               filter_by_task_types("Pour", regexp=True).order_by_stamp()).get_result().df
         self.assertTrue(len(df) > 0)
 
@@ -112,7 +115,6 @@ class TestNeemSqlAlchemy(TestCase):
               .join_performer_tf_on_base_link_name()
               .limit(100)
               ).get_result().df
-        print(df)
         self.assertTrue(len(df) > 0)
 
     def test_participant_base_link_name_with_tf(self):
@@ -122,7 +124,6 @@ class TestNeemSqlAlchemy(TestCase):
               .join_participant_tf_on_base_link_name()
               .limit(100)
               ).get_result().df
-        print(df)
         self.assertTrue(len(df) > 0)
 
     def test_join_participant_base_link(self):
