@@ -1,12 +1,8 @@
 from unittest import TestCase
 
-import pandas as pd
-from sqlalchemy import between, and_, func, not_
-
 from neem_query import NeemQuery
+from neem_query.enums import ColumnLabel as CL
 from neem_query.neems_database import *
-from neem_query.enums import ColumnLabel as CL, PerformerBaseLinkName, PerformerTfHeader, PerformerTf, \
-    ParticipantBaseLinkName, ParticipantBaseLink, IsPerformedByType
 
 
 class TestNeemSqlAlchemy(TestCase):
@@ -129,6 +125,26 @@ class TestNeemSqlAlchemy(TestCase):
         print(df)
         self.assertTrue(len(df) > 0)
 
+    def test_join_participant_base_link(self):
+        df = (self.nq.distinct()
+              .select_participant()
+              .select_participant_base_link()
+              .select_from(DulHasParticipant)
+              .join_participant_base_link()
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+
+    def test_join_performer_base_link_name(self):
+        df = (self.nq.distinct()
+              .select_is_performed_by()
+              .select_is_performed_by_type()
+              .select_performer_base_link_name()
+              .select_from(SomaIsPerformedBy)
+              .join_is_performed_by_type()
+              .join_performer_base_link_name()
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+
     def test_base_link_name(self):
         df = (self.nq.select_task()
               .select_from_tasks()
@@ -218,5 +234,4 @@ class TestNeemSqlAlchemy(TestCase):
 
               .limit(100)
               ).get_result().df
-        print(df)
         self.assertTrue(len(df) > 0)
