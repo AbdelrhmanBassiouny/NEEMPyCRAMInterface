@@ -303,7 +303,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: A dictionary of entities as PyCRAM objects.
         """
         query_result = query_result if query_result is not None else self.get_result()
-        entities = query_result.get_column_values(entity_column_name)
+        entities = query_result.get_column_values(entity_column_name, unique=True)
         entity_objects = {}
         for entity in entities:
             try:
@@ -492,6 +492,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         query_result = query_result if query_result is not None else self.get_result()
         mesh_path_df = query_result.filter_by_participant([object_name]).df
         mesh_path_df = mesh_path_df.dropna(subset=[CL.object_mesh_path.value]).drop_duplicates()
+        if len(mesh_path_df) == 0:
+            return None
         mesh_path = mesh_path_df[CL.object_mesh_path.value].values[0]
         if mesh_path is None:
             return None

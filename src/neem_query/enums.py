@@ -9,15 +9,15 @@ TaskType = aliased(RdfType, name='TaskType')
 ParticipantType = aliased(RdfType, name='ParticipantType')
 SubTask = aliased(DulExecutesTask, name='SubTask')
 SubTaskType = aliased(RdfType, name='SubTaskType')
-TaskParameterType = aliased(RdfType, name='TaskParameterType')
-TaskParameterCategory = aliased(DulClassify, name='TaskParameterCategory')
+TaskParameterClassificationType = aliased(RdfType, name='TaskParameterClassificationType')
+TaskParameterClassification = aliased(DulClassify, name='TaskParameterClassification')
 Agent = aliased(DulClassify, name='Agent')
 AgentType = aliased(RdfType, name='AgentType')
 IsPerformedByType = aliased(RdfType, name='IsPerformedByType')
 ParticipantBaseLink = aliased(UrdfHasBaseLink, name='ParticipantBaseLink')
 PerformerBaseLink = aliased(UrdfHasBaseLink, name='PerformerBaseLink')
-PerformerBaseLinkName = aliased(UrdfHasBaseLinkName, name='PerformerBaseLink')
-ParticipantBaseLinkName = aliased(UrdfHasBaseLinkName, name='ParticipantBaseLink')
+PerformerBaseLinkName = aliased(UrdfHasBaseLinkName, name='PerformerBaseLinkName')
+ParticipantBaseLinkName = aliased(UrdfHasBaseLinkName, name='ParticipantBaseLinkName')
 PerformerTf = aliased(Tf, name='PerformerTf')
 ParticipantTf = aliased(Tf, name='ParticipantTf')
 PerformerTfHeader = aliased(TfHeader, name='PerformerTfHeader')
@@ -58,8 +58,8 @@ class ColumnLabel(Enum):
     time_interval_begin = "begin"
     time_interval_end = "end"
     task_parameter = "task_parameter"
-    task_parameter_category = "task_parameter_category"
-    task_parameter_type = "task_parameter_type"
+    task_parameter_classification = "task_parameter_classification"
+    task_parameter_classification_type = "task_parameter_classification_type"
     agent = "agent"
     agent_type = "agent_type"
     neem_sql_id = "neem_sql_id"
@@ -114,9 +114,9 @@ column_to_label = {DulExecutesTask.dul_Task_o: ColumnLabel.task.value,
                    DulHasTimeInterval.dul_TimeInterval_o: ColumnLabel.time_interval.value,
                    SomaHasIntervalBegin.o: ColumnLabel.time_interval_begin.value,
                    SomaHasIntervalEnd.o: ColumnLabel.time_interval_end.value,
-                   DulHasParameter.dul_Parameter_o: ColumnLabel.task_parameter_category.value,
+                   DulHasParameter.dul_Parameter_o: ColumnLabel.task_parameter_classification.value,
                    DulClassify.dul_Entity_o: ColumnLabel.task_parameter.value,
-                   TaskParameterType.o: ColumnLabel.task_parameter_type.value,
+                   TaskParameterClassificationType.o: ColumnLabel.task_parameter_classification_type.value,
                    Agent.dul_Entity_o: ColumnLabel.agent.value,
                    AgentType.o: ColumnLabel.agent_type.value,
                    SomaIsPerformedBy.dul_Agent_o: ColumnLabel.is_performed_by.value,

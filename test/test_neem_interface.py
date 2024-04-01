@@ -63,7 +63,7 @@ class TestNeemInterface(TestCase):
                select_neem_id().
                select_from_tasks().
                join_task_types().
-               join_neems().filter_by_sql_neem_id([neem_id]).
+               join_neems_metadata().filter_by_sql_neem_id([neem_id]).
                join_task_time_interval().
                order_by_interval_begin()).get_result().df
 
@@ -73,21 +73,17 @@ class TestNeemInterface(TestCase):
                select(SomaHasIntervalBegin.o).select(SomaHasIntervalEnd.o).
                select(DulExecutesTask.neem_id).
                select_from(DulExecutesTask).
-               join(TaskType,
-                    and_(TaskType.s == DulExecutesTask.dul_Task_o,
-                         TaskType.neem_id == DulExecutesTask.neem_id,
-                         TaskType.o != "owl:NamedIndividual")).
+               join_neem_id_tables(TaskType, DulExecutesTask,
+                                   and_(TaskType.s == DulExecutesTask.dul_Task_o,
+                                        TaskType.o != "owl:NamedIndividual")).
                join(Neem,
                     Neem._id == DulExecutesTask.neem_id).filter(Neem.ID == neem_id).
-               join(DulHasTimeInterval,
-                    and_(DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
-                         DulHasTimeInterval.neem_id == DulExecutesTask.neem_id)).
-               join(SomaHasIntervalBegin,
-                    and_(SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
-                         SomaHasIntervalBegin.neem_id == DulHasTimeInterval.neem_id)).
-               join(SomaHasIntervalEnd,
-                    and_(SomaHasIntervalEnd.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
-                         SomaHasIntervalEnd.neem_id == DulHasTimeInterval.neem_id)).
+               join_neem_id_tables(DulHasTimeInterval, DulExecutesTask,
+                                   DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s).
+               join_neem_id_tables(SomaHasIntervalBegin, DulHasTimeInterval,
+                                   SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o).
+               join_neem_id_tables(SomaHasIntervalEnd, DulHasTimeInterval,
+                                   SomaHasIntervalEnd.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o).
                order_by(SomaHasIntervalBegin.o)).get_result().df
 
         self.assertTrue(df1.equals(df2))
@@ -99,18 +95,17 @@ class TestNeemInterface(TestCase):
         self.assertTrue(len(df) > 0)
 
     def test_get_abhijit_pouring_tfs(self):
-        (self.ni.select_tf_columns().select_tf_header_columns().select(Neem.created_by).select_participant_type().select_task_type().
+        (self.ni.select_tf_columns().select(Neem.created_by).select_participant_type().select_task_type().
          select_tf_transform_columns().
          select_from_tasks().
          join_task_time_interval().
-         join_tf_header_on_time_interval(begin_offset=0).join_tf_header_on_tf().join_tf_transfrom().
+         join_tf_on_time_interval(begin_offset=0).join_tf_transform().
          join_task_types().filter_by_task_types(['Pour'], regexp=True).
          join_all_task_participants_data().filter_tf_by_participant_base_link().
-         join_neems().
-         filter(Neem.created_by.in_(['Abhijit Vyas','Abhijit'])).
+         join_neems_metadata().
+         filter(Neem.created_by.in_(['Abhijit Vyas', 'Abhijit'])).
          limit(100)
          )
         qr = self.ni.get_result()
         df = qr.df
         self.assertTrue(len(df) > 0)
-

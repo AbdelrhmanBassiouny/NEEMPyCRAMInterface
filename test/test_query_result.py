@@ -27,7 +27,7 @@ class TestQueryResult(TestCase):
         self.assertTrue(all(t in ['soma:PickingUp', 'soma:Placing'] for t in column_types))
 
     def test_filter_by_sql_neem_id(self):
-        self.ni.query_task_sequence().join_neems().select_sql_neem_id()
+        self.ni.query_task_sequence().join_neems_metadata().select_sql_neem_id()
         qr = self.ni.get_result()
         neem_id = 2
         df = qr.filter_by_sql_neem_id([neem_id]).df

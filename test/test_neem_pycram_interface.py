@@ -90,8 +90,7 @@ class TestNeemPycramInterface(TestCase):
          filter_by_task_types(['Pour'], regexp=True)
          .filter_by_participant_type(['soma:DesignedContainer']))
         motion_data: ReplayNEEMMotionData = self.pni.get_motion_data()
-        self.assertEqual(len(motion_data.poses), len(motion_data.neem_ids))
-        self.assertEqual(len(motion_data.neem_ids), len(motion_data.times))
+        self.assertEqual(len(motion_data.poses), len(motion_data.times))
         self.assertEqual(len(motion_data.times), len(motion_data.participant_instances))
         self.assertTrue(len(motion_data.poses) > 0)
 
@@ -115,13 +114,12 @@ class TestNeemPycramInterface(TestCase):
 
     def test_get_and_download_mesh_of_participant(self):
         (self.pni.select_participant().select_object_mesh_path().
-         select_neem_id().
+         select_neem_id().filter_by_neem_id('633819942a459501ef4d4209').
          select_from_tasks().
          join_task_participants().
          join_object_mesh_path(is_outer=False)
          )
-        mesh_path = self.pni.get_and_download_mesh_of_participant('soma:SM_Cup_2',
-                                                                  '633819942a459501ef4d4209')
+        mesh_path = self.pni.get_and_download_mesh_of_participant('soma:SM_Cup_2')
         self.assertIsInstance(mesh_path, str)
 
     def test_find_file_in_data_dir(self):

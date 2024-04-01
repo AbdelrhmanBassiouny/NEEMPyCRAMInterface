@@ -1,7 +1,9 @@
 from unittest import TestCase
 
 from neem_query import NeemQuery
-from neem_query.enums import ColumnLabel as CL
+from neem_query.enums import ColumnLabel as CL, ParticipantBaseLinkName, ParticipantBaseLink, PerformerBaseLinkName, \
+    PerformerTfTransform, PerformerTf, PerformerTfHeader, ParticipantTfTransform, ParticipantTf, \
+    ParticipantTfHeader
 from neem_query.neems_database import *
 
 
@@ -20,11 +22,11 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertIsNotNone(tasks)
 
     def test_get_task_data(self):
-        task_data = self.nq.get_task_data("Pour", use_regex=True)
+        task_data = self.nq._get_task_data("Pour", use_regex=True)
         self.assertIsNotNone(task_data)
 
     def test_get_task_data_using_joins(self):
-        task_data = self.nq.get_task_data_using_joins("Pour", use_regexp=True)
+        task_data = self.nq._get_task_data_using_joins("Pour", use_regexp=True)
         self.assertIsNotNone(task_data)
 
     def test_join_task_participants(self):
@@ -60,11 +62,10 @@ class TestNeemSqlAlchemy(TestCase):
               join_task_participants().
               join_participant_types().
               join_participant_base_link().
-              join_task_time_interval().
-              join_tf_header_on_time_interval()
-              .join_tf_on_tf_header_and_time_interval_neem_id()
-              .join_tf_transfrom()
-              .join_neems().join_neems_environment().
+              join_task_time_interval()
+              .join_tf_on_time_interval()
+              .join_tf_transform()
+              .join_neems_metadata().join_neems_environment().
               filter_tf_by_participant_base_link().
               filter_by_task_types("Pour", regexp=True).order_by_stamp()).get_result().df
         self.assertTrue(len(df) > 0)
@@ -78,30 +79,32 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertTrue(len(neem_ids) > 0)
 
     def test_query_changed(self):
-        query = self.nq.select_from_tasks().join_neems()
+        query = self.nq.select_from_tasks().join_neems_metadata()
         self.assertTrue(self.nq.query_changed)
-        result = query.get_result()
+        _ = query.get_result()
         self.assertFalse(query.query_changed)
         query.join_task_types()
         self.assertTrue(query.query_changed)
 
     def test_join_agent(self):
-        df = (self.nq.select_agent().select(Neem.ID).select_from_tasks().join_neems().join_agent()).get_result().df
+        df = (self.nq.select_agent().select(Neem.ID).select_from_tasks().join_neems_metadata()
+              .join_is_task_of().join_agent()).get_result().df
         self.assertTrue(len(df) > 0)
 
     def test_join_agent_types(self):
         df = ((self.nq.select_agent_type().select(Neem.ID).select_from_tasks().
-               join_neems().join_agent().join_agent_type()).get_result().df)
+               join_neems_metadata().join_is_task_of().join_agent().join_agent_type()).get_result().df)
         self.assertTrue(len(df) > 0)
 
     def test_join_is_performed_by(self):
         df = (self.nq.select_is_performed_by().select(Neem.ID).select_from_tasks().
-              join_neems().join_task_is_performed_by()).get_result().df
+              join_neems_metadata().join_task_is_performed_by()).get_result().df
         self.assertTrue(len(df) > 0)
 
     def test_join_object_mesh_path(self):
         df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
-              join_neems().join_object_mesh_path()).get_result().filter_dataframe({CL.neem_sql_id.value: [5]}).df
+              join_neems_metadata().join_object_mesh_path()).get_result().filter_dataframe(
+            {CL.neem_sql_id.value: [5]}).df
         self.assertTrue(len(df) > 0)
 
     def test_get_unique_task_types(self):
@@ -109,44 +112,152 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertTrue(len(df) > 0)
 
     def test_performer_base_link_name_with_tf(self):
-        df = (self.nq.select_is_performed_by().select_performer_tf_columns().select_sql_neem_id().
-              select_from(SomaIsPerformedBy).
-              join_performer_base_link_name().join_neems()
+        df = (self.nq.select_is_performed_by()
+              .select_performer_tf_columns()
+              .select_performer_base_link_name()
+              .join_performer_base_link_name()
               .join_performer_tf_on_base_link_name()
               .limit(100)
               ).get_result().df
         self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.performer_base_link_name.value][i] == df[CL.performer_child_frame_id.value][i]
+                            for i in range(len(df))))
 
     def test_participant_base_link_name_with_tf(self):
-        df = (self.nq.select_participant().select_participant_tf_columns().select_sql_neem_id().
-              select_from(DulHasParticipant).
-              join_participant_base_link_name().join_neems()
+        df = (self.nq.select_participant()
+              .select_participant_tf_columns()
+              .select_participant_base_link_name()
+              .join_participant_base_link_name()
               .join_participant_tf_on_base_link_name()
               .limit(100)
               ).get_result().df
         self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.participant_base_link_name.value][i] == df[CL.participant_child_frame_id.value][i]
+                            for i in range(len(df)))
+                        )
 
     def test_join_participant_base_link(self):
         df = (self.nq.distinct()
               .select_participant()
+              .select(ParticipantBaseLink.dul_PhysicalObject_s)
               .select_participant_base_link()
-              .select_from(DulHasParticipant)
               .join_participant_base_link()
               ).get_result().df
         self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.participant.value][i] == df["ParticipantBaseLink_dul_PhysicalObject_s"][i]
+                            for i in range(len(df)))
+                        )
 
     def test_join_performer_base_link_name(self):
         df = (self.nq.distinct()
               .select_is_performed_by()
-              .select_is_performed_by_type()
+              .select(PerformerBaseLinkName.dul_PhysicalObject_s)
               .select_performer_base_link_name()
-              .select_from(SomaIsPerformedBy)
-              .join_is_performed_by_type()
               .join_performer_base_link_name()
               ).get_result().df
         self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.is_performed_by.value][i] == df["PerformerBaseLinkName_dul_PhysicalObject_s"][i]
+                            for i in range(len(df))))
 
-    def test_base_link_name(self):
+    def test_join_participant_base_link_name(self):
+        df = (self.nq.distinct()
+              .select_participant()
+              .select(ParticipantBaseLinkName.dul_PhysicalObject_s)
+              .select_participant_base_link_name()
+              .join_participant_base_link_name()
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.participant.value][i] == df["ParticipantBaseLinkName_dul_PhysicalObject_s"][i]
+                            for i in range(len(df))))
+
+    def test_join_performer_tf_on_time_interval(self):
+        df = (self.nq.select_is_performed_by()
+              .select_time_columns()
+              .select_performer_tf_columns()
+              .select_performer_tf_header_columns()
+              .select_performer_base_link_name()
+              .select_from_tasks()
+              .join_task_time_interval()
+              .join_task_is_performed_by()
+              .join_performer_base_link_name()
+              .join_performer_tf_on_time_interval(begin_offset=0)
+              .limit(100)
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.performer_base_link_name.value][i] == df[CL.performer_child_frame_id.value][i]
+                            for i in range(len(df)))
+                        )
+        self.assertTrue(all(
+            df[CL.time_interval_begin.value][i] <= df[CL.performer_stamp.value][i] <= df[CL.time_interval_end.value][i]
+            for i in range(len(df)))
+        )
+
+    def test_join_participant_tf_on_time_interval(self):
+        df = (self.nq.select_participant()
+              .select_time_columns()
+              .select_participant_tf_columns()
+              .select_participant_base_link_name()
+              .select_from_tasks()
+              .join_task_time_interval()
+              .join_task_participants()
+              .join_participant_base_link_name()
+              .join_participant_tf_on_time_interval(begin_offset=0)
+              .limit(100)
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.participant_base_link_name.value][i] == df[CL.participant_child_frame_id.value][i]
+                            for i in range(len(df)))
+                        )
+        self.assertTrue(all(
+            df[CL.time_interval_begin.value][i] <= df[CL.participant_stamp.value][i] <= df[CL.time_interval_end.value][
+                i]
+            for i in range(len(df)))
+        )
+
+    def test_join_performer_tf_transform(self):
+        df = (self.nq.select_is_performed_by()
+              .select_performer_tf_columns()
+              .select(PerformerTfTransform.ID)
+              .select(PerformerTf.transform)
+              .select(PerformerTfHeader.ID)
+              .select(PerformerTf.header)
+              .select_performer_tf_header_columns()
+              .select_performer_base_link_name()
+              .join_performer_base_link_name()
+              .join_performer_tf_on_base_link_name()
+              .join_performer_tf_transform()
+              .limit(100)
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df['PerformerTfTransform_ID'][i] == df['PerformerTf_transform'][i]
+                            for i in range(len(df)))
+                        )
+        self.assertTrue(all(df['PerformerTfHeader_ID'][i] == df['PerformerTf_header'][i]
+                            for i in range(len(df)))
+                        )
+
+    def test_join_participant_tf_transform(self):
+        df = (self.nq.select_participant()
+              .select_participant_tf_columns()
+              .select(ParticipantTfTransform.ID)
+              .select(ParticipantTf.transform)
+              .select(ParticipantTfHeader.ID)
+              .select(ParticipantTf.header)
+              .select_participant_base_link_name()
+              .join_participant_base_link_name()
+              .join_participant_tf_on_base_link_name()
+              .join_participant_tf_transform()
+              .limit(100)
+              ).get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df['ParticipantTfTransform_ID'][i] == df['ParticipantTf_transform'][i]
+                            for i in range(len(df)))
+                        )
+        self.assertTrue(all(df['ParticipantTfHeader_ID'][i] == df['ParticipantTf_header'][i]
+                            for i in range(len(df)))
+                        )
+
+    def test_performer_and_participant(self):
         df = (self.nq.select_task()
               .select_from_tasks()
               .join_task_time_interval()
@@ -179,9 +290,6 @@ class TestNeemSqlAlchemy(TestCase):
               # Time Interval
               # .join_participant_tf_on_time_interval(begin_offset=0)
 
-              .select_participant_tf_header_columns()
-              .join_participant_tf_header_on_tf()
-
               .select_participant_tf_transform_columns()
               .join_participant_tf_transform()
 
@@ -211,9 +319,6 @@ class TestNeemSqlAlchemy(TestCase):
               # Time Interval
               # .join_performer_tf_on_time_interval(begin_offset=0)
 
-              # .select_performer_tf_header_columns()
-              # .join_performer_tf_header_on_tf()
-
               # .select_performer_tf_transform_columns()
               # .join_performer_tf_transform()
 
@@ -227,11 +332,8 @@ class TestNeemSqlAlchemy(TestCase):
 
               # .join_tf_on_participant()
 
-              # .select_tf_header_columns()
-              # .join_tf_header_on_tf()
-
-              # .select_tf_transfrom_columns()
-              # .join_tf_transfrom()
+              # .select_tf_transform_columns()
+              # .join_tf_transform()
 
               .limit(100)
               ).get_result().df

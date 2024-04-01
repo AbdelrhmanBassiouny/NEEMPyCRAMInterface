@@ -99,7 +99,7 @@ class QueryResult:
         :param task_parameter_categories: the task parameter categories.
         :return: the data of the task parameter categories.
         """
-        return self.filter_dataframe({CL.task_parameter_category.value: task_parameter_categories})
+        return self.filter_dataframe({CL.task_parameter_classification.value: task_parameter_categories})
 
     def filter_by_task_parameter_type(self, task_parameter_types: List[str]) -> 'QueryResult':
         """
@@ -366,7 +366,7 @@ class QueryResult:
         :param drop_na: whether to drop None values or not.
         :return: the task parameter categories in the NEEM.
         """
-        return self.get_column_values(CL.task_parameter_category.value, unique=unique, drop_na=drop_na)
+        return self.get_column_values(CL.task_parameter_classification.value, unique=unique, drop_na=drop_na)
 
     def get_task_parameter_types(self, unique: Optional[bool] = False, drop_na: Optional[bool] = False) -> List[str]:
         """
@@ -375,7 +375,7 @@ class QueryResult:
         :param drop_na: whether to drop None values or not.
         :return: the task parameter types in the NEEM.
         """
-        return self.get_column_values(CL.task_parameter_type.value, unique=unique, drop_na=drop_na)
+        return self.get_column_values(CL.task_parameter_classification_type.value, unique=unique, drop_na=drop_na)
 
     def get_time_intervals(self, unique: Optional[bool] = False) -> List[str]:
         """

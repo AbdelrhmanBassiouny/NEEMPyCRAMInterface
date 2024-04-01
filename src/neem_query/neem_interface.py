@@ -59,7 +59,7 @@ class NeemInterface(NeemQuery):
         :return: The plan as a neem query.
         """
         # noinspection PyTypeChecker
-        self.query_plans().join_neems().filter(Neem.ID == neem_id)
+        self.query_plans().join_neems_metadata().filter(Neem.ID == neem_id)
         return self
 
     def query_plans(self) -> NeemQuery:
@@ -81,7 +81,7 @@ class NeemInterface(NeemQuery):
         :return: The task tree of a single neem as a neem query.
         """
         # noinspection PyTypeChecker
-        self.query_task_sequence().join_neems().filter_by_sql_neem_id([sql_neem_id])
+        self.query_task_sequence().join_neems_metadata().filter_by_sql_neem_id([sql_neem_id])
         return self
 
     def query_task_sequence(self) -> NeemQuery:
@@ -132,7 +132,7 @@ class NeemInterface(NeemQuery):
          join_task_is_performed_by().join_is_performed_by_type().
          join_all_task_parameter_data(is_outer=outer_join_task_parameters).
          join_task_time_interval().
-         join_neems().join_neems_environment().
+         join_neems_metadata().join_neems_environment().
          order_by_interval_begin()
          )
         return self
@@ -156,10 +156,10 @@ class NeemInterface(NeemQuery):
          join_all_task_participants_data(is_outer=not participant_necessary).
          join_object_mesh_path(is_outer=True).
          join_task_time_interval().
-         join_tf_header_on_time_interval().join_tf_header_on_tf().
-         join_tf_transfrom().
+         join_tf_on_time_interval().
+         join_tf_transform().
          join_task_is_performed_by(is_outer=True).join_is_performed_by_type(is_outer=True).
-         join_neems().join_neems_environment()
+         join_neems_metadata().join_neems_environment()
          .order_by_stamp()
          )
         if filter_tf_by_base_link:
