@@ -113,11 +113,11 @@ class TestNeemPycramInterface(TestCase):
         self.assertIsInstance(files[0], str)
 
     def test_get_and_download_mesh_of_participant(self):
-        (self.pni.select_participant().select_object_mesh_path().
+        (self.pni.select_participant().select_participant_mesh_path().
          select_neem_id().filter_by_neem_id('633819942a459501ef4d4209').
          select_from_tasks().
          join_task_participants().
-         join_object_mesh_path(is_outer=False)
+         join_participant_mesh_path(is_outer=False)
          )
         mesh_path = self.pni.get_and_download_mesh_of_participant('soma:SM_Cup_2')
         self.assertIsInstance(mesh_path, str)
