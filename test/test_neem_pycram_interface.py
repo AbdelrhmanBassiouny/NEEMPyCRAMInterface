@@ -131,7 +131,6 @@ class TestNeemPycramInterface(TestCase):
     def test_query_pick_actions(self):
         qr = self.pni.query_pick_actions().select_task_type().get_result()
         df = qr.df
-        print(df)
         self.assertTrue(len(df) > 0)
         self.assertTrue(all(df['task_type'] == 'soma:PickingUp'))
 
