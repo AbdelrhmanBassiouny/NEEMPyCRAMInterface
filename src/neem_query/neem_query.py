@@ -47,6 +47,48 @@ class NeemQuery:
         self.latest_result: Optional[QueryResult] = None
         self._distinct = False
 
+    def select_all_participants_semantic_data(self) -> 'NeemQuery':
+        """
+        Select all the participants' data.
+        :return: the modified query.
+        """
+        (self.select_participant_type()
+         .select_participant_base_link()
+         .select_participant_base_link_name()
+         .select_participant_mesh_path()
+         .select_participant())
+        return self
+
+    def select_all_participants_data(self) -> 'NeemQuery':
+        """
+        Select all the participants' semantic data and the tf data.
+        :return: the modified query.
+        """
+        (self.select_all_participants_semantic_data()
+         .select_participant_tf_columns()
+         .select_participant_tf_transform_columns())
+        return self
+
+    def select_all_performers_semantic_data(self) -> 'NeemQuery':
+        """
+        Select all the performers' data.
+        :return: the modified query.
+        """
+        (self.select_is_performed_by_type().
+         select_is_performed_by().
+         select_performer_base_link_name())
+        return self
+
+    def select_all_performers_data(self) -> 'NeemQuery':
+        """
+        Select all the performers' semantic data and the tf data.
+        :return: the modified query.
+        """
+        (self.select_all_performers_semantic_data()
+         .select_performer_tf_columns()
+         .select_performer_tf_transform_columns())
+        return self
+
     def select_tf_columns(self) -> 'NeemQuery':
         """
         Select tf data (transform, header, child_frame_id) to the query,
@@ -276,7 +318,7 @@ class NeemQuery:
         self._update_selected_columns([Neem.ID])
         return self
 
-    def select_object_mesh_path(self) -> 'NeemQuery':
+    def select_participant_mesh_path(self) -> 'NeemQuery':
         """
         Select object mesh path column.
         :return: the modified query.
@@ -415,79 +457,6 @@ class NeemQuery:
         self.query = self._filter(query, self.in_filters, self.remove_filters, self.filters)
         return self.query
 
-    def join_all_subtasks_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join all the subtasks' data.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        (self.join_has_constituent(is_outer=is_outer)
-         .join_subtasks(is_outer=is_outer)
-         .join_subtask_type(is_outer=is_outer))
-        return self
-
-    def join_has_constituent(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join the has constituent table. Assumes DulExecutesTask has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(DulHasConstituent, DulExecutesTask,
-                                 on=DulHasConstituent.dul_Entity_s == DulExecutesTask.dul_Action_s,
-                                 is_outer=is_outer)
-        return self
-
-    def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join the subtasks table. Assumes DulHasConstituent has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(SubTask, DulHasConstituent,
-                                 on=SubTask.dul_Action_s == DulHasConstituent.dul_Entity_o,
-                                 is_outer=is_outer)
-        return self
-
-    def join_subtask_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join the subtask type table. Assumes subtasks have been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        return self._join_type(SubTaskType, SubTask, SubTask.dul_Task_o, is_outer=is_outer)
-
-    def join_all_task_participants_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join all the participants' data.
-        :param is_outer: whether to use outer join or not.
-        :return: the NEEMs as a pandas dataframe.
-        """
-        (self.join_task_participants(is_outer=is_outer).
-         join_participant_types(is_outer=is_outer).
-         join_participant_base_link(is_outer=is_outer).
-         join_participant_base_link_name(is_outer=is_outer))
-        return self
-
-    def join_task_participants(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add task participant_types to the query,
-        Assumes DulExecutesTask has been joined/selected already.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(DulHasParticipant, DulExecutesTask,
-                                 on=DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s,
-                                 is_outer=is_outer)
-        return self
-
-    def join_participant_types(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add participant types to the query,
-        Assumes participant_types have been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        return self._join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o, is_outer=is_outer)
-
     def join_task_types(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add task types to the query,
@@ -496,29 +465,6 @@ class NeemQuery:
         :return: the modified query.
         """
         return self._join_type(TaskType, DulExecutesTask, DulExecutesTask.dul_Task_o, is_outer=is_outer)
-
-    def join_participant_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add base links of participants to the query,
-        Assumes DulHasParticipant have been joined/selected already.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(ParticipantBaseLink, DulHasParticipant,
-                                 on=ParticipantBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
-                                 is_outer=is_outer)
-        return self
-
-    def join_participant_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add ParticipantBaseLinkName to the query,
-        Assumes DulHasParticipant has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(ParticipantBaseLinkName, DulHasParticipant,
-                                 on=ParticipantBaseLinkName.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
-                                 is_outer=is_outer)
-        return self
 
     def join_task_time_interval(self) -> 'NeemQuery':
         """
@@ -532,163 +478,6 @@ class NeemQuery:
                                  on=SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o)
         self.join_neem_id_tables(SomaHasIntervalEnd, SomaHasIntervalBegin,
                                  on=SomaHasIntervalEnd.dul_TimeInterval_s == SomaHasIntervalBegin.dul_TimeInterval_s)
-        return self
-
-    def join_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
-        """
-        Add tf data (transform, header, child_frame_id) to the query,
-        Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
-        :param begin_offset: the time offset from the beginning of the task.
-        :param end_offset: the time offset from the end of the task.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_time_interval(Tf, TfHeader, begin_offset, end_offset)
-
-    def join_performer_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add base links of performers to the query,
-        Assumes SomaIsPerformedBy have been joined/selected already.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(PerformerBaseLink, SomaIsPerformedBy,
-                                 on=PerformerBaseLink.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
-                                 is_outer=is_outer)
-        return self
-
-    def join_performer_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add PerformerBaseLinkName to the query,
-        Assumes SomaIsPerformedBy has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(PerformerBaseLinkName, SomaIsPerformedBy,
-                                 on=PerformerBaseLinkName.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
-                                 is_outer=is_outer)
-        return self
-
-    def join_performer_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                           end_offset: Optional[float] = 0) -> 'NeemQuery':
-        """
-        Add performer tf data (transform, header, child_frame_id) to the query,
-        Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and PerformerBaseLinkName have been joined/selected already.
-        :param begin_offset: the time offset from the beginning of the task.
-        :param end_offset: the time offset from the end of the task.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_time_interval_and_frame_id(PerformerTf, PerformerTfHeader,
-                                                                  PerformerBaseLinkName.o,
-                                                                  begin_offset, end_offset)
-
-    def join_participant_tf_on_time_interval(self, begin_offset: Optional[float] = -40,
-                                             end_offset: Optional[float] = 0) -> 'NeemQuery':
-        """
-        Add participant tf data (transform, header, child_frame_id) to the query,
-        Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and ParticipantBaseLinkName have been joined/selected already.
-        :param begin_offset: the time offset from the beginning of the task.
-        :param end_offset: the time offset from the end of the task.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_time_interval_and_frame_id(ParticipantTf, ParticipantTfHeader,
-                                                                  ParticipantBaseLinkName.o,
-                                                                  begin_offset, end_offset)
-
-    def join_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add tf data (transform, header, child_frame_id) to the query,
-        Assumes UrdfHasBaseLink has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        """
-        return self._join_entity_tf_using_child_frame_id(Tf, func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
-                                                         UrdfHasBaseLink, is_outer=is_outer)
-
-    def join_tf_transform(self) -> 'NeemQuery':
-        """
-        Add transform data to the query.
-        Assumes tf has been joined/selected already.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_transform(TfTransform, Tf, TransformTranslation, TransformRotation)
-
-    def join_performer_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add performer tf data (transform, header, child_frame_id) to the query,
-        Assumes PerformerBaseLinkName has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_base_link(PerformerTf, PerformerTfHeader, PerformerBaseLink, is_outer=is_outer)
-
-    def join_performer_tf_on_base_link_name(self) -> 'NeemQuery':
-        """
-        Add performer tf data (transform, header, child_frame_id) to the query,
-        Assumes PerformerBaseLinkName has been joined/selected already.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_base_link_name(PerformerTf, PerformerTfHeader, PerformerBaseLinkName)
-
-    def join_performer_tf_transform(self) -> 'NeemQuery':
-        """
-        Add transform data to the query.
-        Assumes performer tf has been joined/selected already.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_transform(PerformerTfTransform, PerformerTf, PerformerTransformTranslation,
-                                              PerformerTransformRotation)
-
-    def join_participant_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Add participant tf data (transform, header, child_frame_id) to the query,
-        Assumes ParticipantBaseLinkName has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_base_link(ParticipantTf, ParticipantTfHeader,
-                                                 ParticipantBaseLink, is_outer=is_outer)
-
-    def join_participant_tf_on_base_link_name(self) -> 'NeemQuery':
-        """
-        Add participant tf data (transform, header, child_frame_id) to the query,
-        Assumes ParticipantBaseLinkName has been joined/selected already.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_on_base_link_name(ParticipantTf, ParticipantTfHeader, ParticipantBaseLinkName)
-
-    def join_participant_tf_transform(self) -> 'NeemQuery':
-        """
-        Add transform data to the query.
-        Assumes participant tf has been joined/selected already.
-        :return: the modified query.
-        """
-        return self._join_entity_tf_transform(ParticipantTfTransform, ParticipantTf, ParticipantTransformTranslation,
-                                              ParticipantTransformRotation)
-
-    def join_neems_metadata(self, on: Optional[BinaryExpression] = None) -> 'NeemQuery':
-        """
-        Join the neem table which contains the neems metadata, if on is None, will join on the neem_id column of
-         any table that has it.
-        :param on: the condition to join on.
-        :return: the modified query.
-        """
-        if on is None:
-            neem_id = self.find_neem_id()
-            if neem_id is None:
-                logging.error("The joining condition was not specified for the neems table,"
-                              " and no neem_id was found in the already joined/selected tables")
-                raise ValueError("No neem_id found in the tables")
-            on = Neem._id == neem_id
-        joins = {Neem: on}
-        self._update_joins(joins)
-        return self
-
-    def join_neems_environment(self) -> 'NeemQuery':
-        """
-        Join the neems_environment_index table. Assumes neem has been joined/selected already.
-        :return: the modified query.
-        """
-        joins = {NeemsEnvironmentIndex: NeemsEnvironmentIndex.neems_ID == Neem.ID}
-        self._update_joins(joins)
         return self
 
     def join_all_task_parameter_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -745,24 +534,164 @@ class NeemQuery:
                                  is_outer=is_outer)
         return self
 
-    def join_agent(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_all_participants_data(self, is_outer: Optional[bool] = False,
+                                   begin_offset: Optional[float] = 0,
+                                   end_offset: Optional[float] = 0) -> 'NeemQuery':
         """
-        Join the agent table. Assumes DulIsTaskOf has been joined/selected already.
+        Join all the participants' semantic data and the tf data.
+        :param is_outer: whether to use outer join or not.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        (self.join_all_participants_semantic_data(is_outer=is_outer).
+         join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset).
+         join_participant_tf_transform())
+        return self
+
+    def join_all_participants_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the participants' data.
         :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        self.join_neem_id_tables(Agent, DulIsTaskOf,
-                                 on=Agent.dul_Concept_s == DulIsTaskOf.dul_Role_o,
+        (self.join_task_participants(is_outer=is_outer).
+         join_participant_types(is_outer=is_outer).
+         join_participant_base_link(is_outer=is_outer).
+         join_participant_base_link_name(is_outer=is_outer).
+         join_participant_mesh_path(is_outer=True))
+        return self
+
+    def join_task_participants(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add task participant_types to the query,
+        Assumes DulExecutesTask has been joined/selected already.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(DulHasParticipant, DulExecutesTask,
+                                 on=DulHasParticipant.dul_Event_s == DulExecutesTask.dul_Action_s,
                                  is_outer=is_outer)
         return self
 
-    def join_agent_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_participant_types(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
-        Join the agent type table. Assumes Agent has been joined/selected already.
+        Add participant types to the query,
+        Assumes participant_types have been joined/selected already.
         :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        return self._join_type(AgentType, Agent, Agent.dul_Entity_o, is_outer=is_outer)
+        return self._join_type(ParticipantType, DulHasParticipant, DulHasParticipant.dul_Object_o, is_outer=is_outer)
+
+    def join_participant_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add base links of participants to the query,
+        Assumes DulHasParticipant have been joined/selected already.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(ParticipantBaseLink, DulHasParticipant,
+                                 on=ParticipantBaseLink.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_participant_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add ParticipantBaseLinkName to the query,
+        Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(ParticipantBaseLinkName, DulHasParticipant,
+                                 on=ParticipantBaseLinkName.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_participant_mesh_path(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the object mesh path table. Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_participant_shape(is_outer=is_outer).
+         join_shape_mesh(is_outer=is_outer).
+         join_mesh_path(is_outer=is_outer))
+        return self
+
+    def join_participant_shape(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the object shape table. Assumes DulHasParticipant has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(SomaHasShape, DulHasParticipant,
+                                 on=SomaHasShape.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_participant_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
+                                             end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Add participant tf data (transform, header, child_frame_id) to the query,
+        Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and ParticipantBaseLinkName have been joined/selected already.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_time_interval_and_frame_id(ParticipantTf, ParticipantTfHeader,
+                                                                  ParticipantBaseLinkName.o, begin_offset,
+                                                                  end_offset)
+
+    def join_participant_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add participant tf data (transform, header, child_frame_id) to the query,
+        Assumes ParticipantBaseLink has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_base_link(ParticipantTf, ParticipantTfHeader,
+                                                 ParticipantBaseLink, is_outer=is_outer)
+
+    def join_participant_tf_on_base_link_name(self) -> 'NeemQuery':
+        """
+        Add participant tf data (transform, header, child_frame_id) to the query,
+        Assumes ParticipantBaseLinkName has been joined/selected already.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_base_link_name(ParticipantTf, ParticipantTfHeader, ParticipantBaseLinkName)
+
+    def join_participant_tf_transform(self) -> 'NeemQuery':
+        """
+        Add transform data to the query.
+        Assumes participant tf has been joined/selected already.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_transform(ParticipantTfTransform, ParticipantTf, ParticipantTransformTranslation,
+                                              ParticipantTransformRotation)
+
+    def join_all_performers_data(self, is_outer: Optional[bool] = False,
+                                 begin_offset: Optional[float] = 0,
+                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Join all the performers' data.
+        :param is_outer: whether to use outer join or not.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the NEEMs as a pandas dataframe.
+        """
+        (self.join_all_performers_semantic_data(is_outer=is_outer).
+         join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset).
+         join_performer_tf_transform())
+        return self
+
+    def join_all_performers_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the performers' data.
+        :param is_outer: whether to use outer join or not.
+        :return: the NEEMs as a pandas dataframe.
+        """
+        (self.join_task_is_performed_by(is_outer=is_outer).
+         join_is_performed_by_type(is_outer=is_outer).
+         join_performer_base_link_name(is_outer=True))
+        return self
 
     def join_task_is_performed_by(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -783,27 +712,154 @@ class NeemQuery:
         """
         return self._join_type(IsPerformedByType, SomaIsPerformedBy, SomaIsPerformedBy.dul_Agent_o, is_outer=is_outer)
 
-    def join_object_mesh_path(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_performer_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
-        Join the object mesh path table. Assumes DulHasParticipant has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
+        Add base links of performers to the query,
+        Assumes SomaIsPerformedBy have been joined/selected already.
         :return: the modified query.
         """
-        (self.join_object_shape(is_outer=is_outer).
-         join_shape_mesh(is_outer=is_outer).
-         join_mesh_path(is_outer=is_outer))
-        return self
-
-    def join_object_shape(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
-        """
-        Join the object shape table. Assumes DulHasParticipant has been joined/selected already.
-        :param is_outer: whether to use outer join or not.
-        :return: the modified query.
-        """
-        self.join_neem_id_tables(SomaHasShape, DulHasParticipant,
-                                 on=SomaHasShape.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
+        self.join_neem_id_tables(PerformerBaseLink, SomaIsPerformedBy,
+                                 on=PerformerBaseLink.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
                                  is_outer=is_outer)
         return self
+
+    def join_performer_base_link_name(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add PerformerBaseLinkName to the query,
+        Assumes SomaIsPerformedBy has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(PerformerBaseLinkName, SomaIsPerformedBy,
+                                 on=PerformerBaseLinkName.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_performer_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
+                                           end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Add performer tf data (transform, header, child_frame_id) to the query,
+        Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and PerformerBaseLinkName have been joined/selected already.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_time_interval_and_frame_id(PerformerTf, PerformerTfHeader,
+                                                                  PerformerBaseLinkName.o,
+                                                                  begin_offset, end_offset)
+
+    def join_performer_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add performer tf data (transform, header, child_frame_id) to the query,
+        Assumes PerformerBaseLinkName has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_base_link(PerformerTf, PerformerTfHeader, PerformerBaseLink, is_outer=is_outer)
+
+    def join_performer_tf_on_base_link_name(self) -> 'NeemQuery':
+        """
+        Add performer tf data (transform, header, child_frame_id) to the query,
+        Assumes PerformerBaseLinkName has been joined/selected already.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_base_link_name(PerformerTf, PerformerTfHeader, PerformerBaseLinkName)
+
+    def join_performer_tf_transform(self) -> 'NeemQuery':
+        """
+        Add transform data to the query.
+        Assumes performer tf has been joined/selected already.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_transform(PerformerTfTransform, PerformerTf, PerformerTransformTranslation,
+                                              PerformerTransformRotation)
+
+    def join_all_subtasks_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join all the subtasks' data.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        (self.join_has_constituent(is_outer=is_outer)
+         .join_subtasks(is_outer=is_outer)
+         .join_subtask_type(is_outer=is_outer))
+        return self
+
+    def join_has_constituent(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the has constituent table. Assumes DulExecutesTask has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(DulHasConstituent, DulExecutesTask,
+                                 on=DulHasConstituent.dul_Entity_s == DulExecutesTask.dul_Action_s,
+                                 is_outer=is_outer)
+        return self
+
+    def join_subtasks(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the subtasks table. Assumes DulHasConstituent has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(SubTask, DulHasConstituent,
+                                 on=SubTask.dul_Action_s == DulHasConstituent.dul_Entity_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_subtask_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the subtask type table. Assumes subtasks have been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self._join_type(SubTaskType, SubTask, SubTask.dul_Task_o, is_outer=is_outer)
+
+    def join_neems_metadata(self, on: Optional[BinaryExpression] = None) -> 'NeemQuery':
+        """
+        Join the neem table which contains the neems metadata, if on is None, will join on the neem_id column of
+         any table that has it.
+        :param on: the condition to join on.
+        :return: the modified query.
+        """
+        if on is None:
+            neem_id = self.find_neem_id()
+            if neem_id is None:
+                logging.error("The joining condition was not specified for the neems table,"
+                              " and no neem_id was found in the already joined/selected tables")
+                raise ValueError("No neem_id found in the tables")
+            on = Neem._id == neem_id
+        joins = {Neem: on}
+        self._update_joins(joins)
+        return self
+
+    def join_neems_environment(self) -> 'NeemQuery':
+        """
+        Join the neems_environment_index table. Assumes neem has been joined/selected already.
+        :return: the modified query.
+        """
+        joins = {NeemsEnvironmentIndex: NeemsEnvironmentIndex.neems_ID == Neem.ID}
+        self._update_joins(joins)
+        return self
+
+    def join_agent(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the agent table. Assumes DulIsTaskOf has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self.join_neem_id_tables(Agent, DulIsTaskOf,
+                                 on=Agent.dul_Concept_s == DulIsTaskOf.dul_Role_o,
+                                 is_outer=is_outer)
+        return self
+
+    def join_agent_type(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the agent type table. Assumes Agent has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self._join_type(AgentType, Agent, Agent.dul_Entity_o, is_outer=is_outer)
 
     def join_shape_mesh(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -827,6 +883,34 @@ class NeemQuery:
                                  is_outer=is_outer)
         return self
 
+    def join_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
+                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_on_time_interval(Tf, TfHeader, begin_offset, end_offset)
+
+    def join_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Add tf data (transform, header, child_frame_id) to the query,
+        Assumes UrdfHasBaseLink has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        """
+        return self._join_entity_tf_using_child_frame_id(Tf, func.substring_index(UrdfHasBaseLink.urdf_Link_o, ':', -1),
+                                                         UrdfHasBaseLink, is_outer=is_outer)
+
+    def join_tf_transform(self) -> 'NeemQuery':
+        """
+        Add transform data to the query.
+        Assumes tf has been joined/selected already.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_transform(TfTransform, Tf, TransformTranslation, TransformRotation)
+
     def _join_entity_tf_on_base_link(self, entity_tf: Type[Tf], entity_tf_header: Type[TfHeader],
                                      entity_base_link: Type[UrdfHasBaseLink],
                                      is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -846,7 +930,7 @@ class NeemQuery:
     def _join_entity_tf_on_time_interval_and_frame_id(self, entity_tf: Type[Tf],
                                                       entity_tf_header: Type[TfHeader],
                                                       entity_frame_id: str,
-                                                      begin_offset: Optional[float] = -40,
+                                                      begin_offset: Optional[float] = 0,
                                                       end_offset: Optional[float] = 0) -> 'NeemQuery':
         """
         Add entity (performer, participant, ...etc.) tf data (transform, header, child_frame_id) to the query,
@@ -862,7 +946,7 @@ class NeemQuery:
         return self
 
     def _join_entity_tf_on_time_interval(self, entity_tf: Type[Tf], entity_tf_header: Type[TfHeader],
-                                         begin_offset: Optional[float] = -40,
+                                         begin_offset: Optional[float] = 0,
                                          end_offset: Optional[float] = 0) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,

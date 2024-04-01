@@ -159,7 +159,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return:
         """
         pni = PyCRAMNEEMInterface.from_pycram_neem_interface(self)
-        pni.query_neems_motion_replay_data(filter_tf_by_base_link=False)
+        pni.query_neems_motion_replay_data()
 
     @staticmethod
     def get_performer_base_link(performer: str) -> str:

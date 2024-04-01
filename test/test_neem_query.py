@@ -102,8 +102,8 @@ class TestNeemSqlAlchemy(TestCase):
         self.assertTrue(len(df) > 0)
 
     def test_join_object_mesh_path(self):
-        df = (self.nq.select_object_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
-              join_neems_metadata().join_object_mesh_path()).get_result().filter_dataframe(
+        df = (self.nq.select_participant_mesh_path().select_participant().select(Neem.ID).select_from(DulHasParticipant).
+              join_neems_metadata().join_participant_mesh_path()).get_result().filter_dataframe(
             {CL.neem_sql_id.value: [5]}).df
         self.assertTrue(len(df) > 0)
 
@@ -193,15 +193,10 @@ class TestNeemSqlAlchemy(TestCase):
         )
 
     def test_join_participant_tf_on_time_interval(self):
-        df = (self.nq.select_participant()
-              .select_time_columns()
-              .select_participant_tf_columns()
-              .select_participant_base_link_name()
+        df = (self.nq.select_all_participants_data().select_time_columns()
               .select_from_tasks()
               .join_task_time_interval()
-              .join_task_participants()
-              .join_participant_base_link_name()
-              .join_participant_tf_on_time_interval(begin_offset=0)
+              .join_all_participants_data()
               .limit(100)
               ).get_result().df
         self.assertTrue(len(df) > 0)
