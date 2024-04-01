@@ -58,7 +58,7 @@ and column names and table names.
 
 ```Python
 from neem_query import NeemQuery, TaskType
-from neem_query.neems_database import SomaHasIntervalBegin, SomaHasIntervalEnd, DulExecutesTask,\
+from neem_query.neems_database import SomaHasIntervalBegin, SomaHasIntervalEnd, DulExecutesTask,
     DulHasTimeInterval, Neem
 from sqlalchemy import and_
 
@@ -70,21 +70,17 @@ df = (nq.select(TaskType.o).
       select(SomaHasIntervalBegin.o).select(SomaHasIntervalEnd.o).
       select(DulExecutesTask.neem_id).
       select_from(DulExecutesTask).
-      join(TaskType,
-           and_(TaskType.s == DulExecutesTask.dul_Task_o,
-                TaskType.neem_id == DulExecutesTask.neem_id,
-                TaskType.o != "owl:NamedIndividual")).
+      join_neem_id_tables(TaskType, DulExecutesTask,
+                          and_(TaskType.s == DulExecutesTask.dul_Task_o,
+                               TaskType.o != "owl:NamedIndividual")).
       join(Neem,
            Neem._id == DulExecutesTask.neem_id).filter(Neem.ID == neem_id).
-      join(DulHasTimeInterval,
-           and_(DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s,
-                DulHasTimeInterval.neem_id == DulExecutesTask.neem_id)).
-      join(SomaHasIntervalBegin,
-           and_(SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
-                SomaHasIntervalBegin.neem_id == DulHasTimeInterval.neem_id)).
-      join(SomaHasIntervalEnd,
-           and_(SomaHasIntervalEnd.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o,
-                SomaHasIntervalEnd.neem_id == DulHasTimeInterval.neem_id)).
+      join_neem_id_tables(DulHasTimeInterval, DulExecutesTask,
+                          DulHasTimeInterval.dul_Event_s == DulExecutesTask.dul_Action_s).
+      join_neem_id_tables(SomaHasIntervalBegin, DulHasTimeInterval,
+                          SomaHasIntervalBegin.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o).
+      join_neem_id_tables(SomaHasIntervalEnd, DulHasTimeInterval,
+                          SomaHasIntervalEnd.dul_TimeInterval_s == DulHasTimeInterval.dul_TimeInterval_o).
       order_by(SomaHasIntervalBegin.o)).get_result().df
 
 print(df)
