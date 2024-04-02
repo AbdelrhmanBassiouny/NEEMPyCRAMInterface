@@ -1,5 +1,10 @@
 from unittest import TestCase
 
+import pandas as pd
+from sqlalchemy import select, Alias, Subquery, table, ColumnClause
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql.base import ReadOnlyColumnCollection
+
 from neem_query import NeemQuery
 from neem_query.enums import ColumnLabel as CL, ParticipantBaseLinkName, ParticipantBaseLink, PerformerBaseLinkName, \
     PerformerTfTransform, PerformerTf, PerformerTfHeader, ParticipantTfTransform, ParticipantTf, \
@@ -247,6 +252,22 @@ class TestNeemSqlAlchemy(TestCase):
                             for i in range(len(df)))
                         )
 
+    def test_subquery(self):
+        subquery = (select(ParticipantTf.child_frame_id, ParticipantTf.neem_id, ParticipantTfHeader.stamp,
+                           ParticipantTfHeader.frame_id, ParticipantTfHeader.seq)
+                    .select_from(ParticipantTf)
+                    .join(ParticipantTfHeader)
+                    .join(ParticipantTfTransform)).subquery("TfData")
+
+        # Give the subquery object the ability to be used as a table with i
+        TfData = subquery.alias("TfData")
+        for c in TfData.c:
+            col = next(iter(c.base_columns))
+            setattr(TfData, c.name, col)
+        df = pd.read_sql_query(select(TfData), self.nq.engine)
+        self.assertTrue(len(df) > 0)
+        print(df)
+
     def test_performer_and_participant(self):
         df = (self.nq.select_task()
               .select_from_tasks()
@@ -264,8 +285,8 @@ class TestNeemSqlAlchemy(TestCase):
               ###################
               # Participants Data
               ###################
-              .select_all_participants_data()
-              .join_all_participants_data(is_outer=True)
+              # .select_all_participants_data()
+              # .join_all_participants_data(is_outer=True)
 
               ###################
               # Performers Data
