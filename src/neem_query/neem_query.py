@@ -1,6 +1,7 @@
 import logging
 
 import pandas as pd
+import sqlalchemy.sql.base
 from sqlalchemy import (create_engine, Engine, between, and_, func, Table, BinaryExpression, select,
                         Select, not_, or_)
 from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
@@ -66,7 +67,8 @@ class NeemQuery:
         """
         (self.select_all_participants_semantic_data()
          .select_participant_tf_columns()
-         .select_participant_tf_transform_columns())
+         # .select_participant_tf_transform_columns()
+         )
         return self
 
     def select_all_performers_semantic_data(self) -> 'NeemQuery':
@@ -86,7 +88,8 @@ class NeemQuery:
         """
         (self.select_all_performers_semantic_data()
          .select_performer_tf_columns()
-         .select_performer_tf_transform_columns())
+         # .select_performer_tf_transform_columns()
+         )
         return self
 
     def select_tf_columns(self) -> 'NeemQuery':
@@ -544,9 +547,11 @@ class NeemQuery:
         :param end_offset: the time offset from the end of the task.
         :return: the modified query.
         """
-        (self.join_all_participants_semantic_data(is_outer=is_outer).
-         join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset).
-         join_participant_tf_transform())
+        (self.join_all_participants_semantic_data(is_outer=is_outer)
+         .join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
+                                              is_outer=is_outer)
+        # .join_participant_tf_transform(is_outer=is_outer)
+         )
         return self
 
     def join_all_participants_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -628,17 +633,19 @@ class NeemQuery:
         return self
 
     def join_participant_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
-                                             end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                             end_offset: Optional[float] = 0,
+                                             is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add participant tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and ParticipantBaseLinkName have been joined/selected already.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
         return self._join_entity_tf_on_time_interval_and_frame_id(ParticipantTf, ParticipantTfHeader,
-                                                                  ParticipantBaseLinkName.o, begin_offset,
-                                                                  end_offset)
+                                                                  ParticipantBaseLink.urdf_Link_o, begin_offset,
+                                                                  end_offset, is_outer=is_outer)
 
     def join_participant_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -658,14 +665,15 @@ class NeemQuery:
         """
         return self._join_entity_tf_on_base_link_name(ParticipantTf, ParticipantTfHeader, ParticipantBaseLinkName)
 
-    def join_participant_tf_transform(self) -> 'NeemQuery':
+    def join_participant_tf_transform(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add transform data to the query.
         Assumes participant tf has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
         return self._join_entity_tf_transform(ParticipantTfTransform, ParticipantTf, ParticipantTransformTranslation,
-                                              ParticipantTransformRotation)
+                                              ParticipantTransformRotation, is_outer=is_outer)
 
     def join_all_performers_data(self, is_outer: Optional[bool] = False,
                                  begin_offset: Optional[float] = 0,
@@ -677,9 +685,11 @@ class NeemQuery:
         :param end_offset: the time offset from the end of the task.
         :return: the NEEMs as a pandas dataframe.
         """
-        (self.join_all_performers_semantic_data(is_outer=is_outer).
-         join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset).
-         join_performer_tf_transform())
+        (self.join_all_performers_semantic_data(is_outer=is_outer)
+         .join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
+                                            is_outer=is_outer)
+         # .join_performer_tf_transform(is_outer=is_outer)
+         )
         return self
 
     def join_all_performers_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -736,17 +746,20 @@ class NeemQuery:
         return self
 
     def join_performer_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
-                                           end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                           end_offset: Optional[float] = 0,
+                                           is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add performer tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and PerformerBaseLinkName have been joined/selected already.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
         return self._join_entity_tf_on_time_interval_and_frame_id(PerformerTf, PerformerTfHeader,
                                                                   PerformerBaseLinkName.o,
-                                                                  begin_offset, end_offset)
+                                                                  begin_offset, end_offset,
+                                                                  is_outer=is_outer)
 
     def join_performer_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -765,14 +778,15 @@ class NeemQuery:
         """
         return self._join_entity_tf_on_base_link_name(PerformerTf, PerformerTfHeader, PerformerBaseLinkName)
 
-    def join_performer_tf_transform(self) -> 'NeemQuery':
+    def join_performer_tf_transform(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add transform data to the query.
         Assumes performer tf has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
         return self._join_entity_tf_transform(PerformerTfTransform, PerformerTf, PerformerTransformTranslation,
-                                              PerformerTransformRotation)
+                                              PerformerTransformRotation, is_outer=is_outer)
 
     def join_all_subtasks_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
@@ -931,7 +945,8 @@ class NeemQuery:
                                                       entity_tf_header: Type[TfHeader],
                                                       entity_frame_id: str,
                                                       begin_offset: Optional[float] = 0,
-                                                      end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                                      end_offset: Optional[float] = 0,
+                                                      is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add entity (performer, participant, ...etc.) tf data (transform, header, child_frame_id) to the query,
         :param entity_tf: The tf table for the entity.
@@ -939,15 +954,19 @@ class NeemQuery:
         :param entity_frame_id: The frame id of the entity.
         :param begin_offset: The time offset from the beginning of the task.
         :param end_offset: The time offset from the end of the task.
+        :param is_outer: Whether to use outer join or not.
         :return: The modified query.
         """
-        self._join_entity_tf_on_time_interval(entity_tf, entity_tf_header, begin_offset, end_offset)
-        self._update_join_with_conditions(entity_tf, [entity_tf.child_frame_id == entity_frame_id])
+        self._join_entity_tf_on_time_interval(entity_tf, entity_tf_header, begin_offset, end_offset,
+                                              child_frame_id=entity_frame_id, is_outer=is_outer)
+        # self._update_join_with_conditions(entity_tf, [entity_tf.child_frame_id == entity_frame_id])
         return self
 
     def _join_entity_tf_on_time_interval(self, entity_tf: Type[Tf], entity_tf_header: Type[TfHeader],
                                          begin_offset: Optional[float] = 0,
-                                         end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                         end_offset: Optional[float] = 0,
+                                         child_frame_id: Optional[str] = None,
+                                         is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin and SomaHasIntervalEnd have been joined/selected already.
@@ -955,14 +974,23 @@ class NeemQuery:
         :param entity_tf_header: the entity tf header table.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {entity_tf_header: between(entity_tf_header.stamp,
-                                           SomaHasIntervalBegin.o + begin_offset,
-                                           SomaHasIntervalEnd.o + end_offset)}
-        self._update_joins(joins)
-        self.join_neem_id_tables(entity_tf, SomaHasIntervalBegin,
-                                 on=entity_tf.header == entity_tf_header.ID)
+        new_query = NeemQuery(self.engine.url.__str__())
+        subquery = (new_query
+                    ._select_entity_tf_columns(entity_tf, entity_tf_header)
+                    .select(entity_tf.neem_id)
+                    ._join_entity_tf_header_on_tf(entity_tf_header, entity_tf)).construct_query().subquery('')
+        self.select(*[col for col in subquery.c])
+        self.join_neem_id_tables(subquery, SomaHasIntervalBegin, neem_id=subquery.c.neem_id,
+                                 is_outer=is_outer)
+        cond = between(subquery.c[column_to_label[entity_tf_header.stamp]],
+                       SomaHasIntervalBegin.o + begin_offset,
+                       SomaHasIntervalEnd.o + end_offset)
+        if child_frame_id is not None:
+            cond = and_(cond, subquery.c[column_to_label[entity_tf.child_frame_id]] == child_frame_id)
+        self._update_join_with_conditions(subquery, [cond])
         return self
 
     def _join_entity_tf_using_child_frame_id(self, entity_tf: Type[Tf],
@@ -1011,16 +1039,23 @@ class NeemQuery:
     def _join_entity_tf_transform(self, transform_table: Type[TfTransform],
                                   tf_table: Type[Tf],
                                   transform_translation: Type[TransformTranslation],
-                                  transform_rotation: Type[TransformRotation]) -> 'NeemQuery':
+                                  transform_rotation: Type[TransformRotation],
+                                  is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Add transform data to the query.
         Assumes tf has been joined/selected already.
+        :param transform_table: the transform table.
+        :param tf_table: the tf table.
+        :param transform_translation: the transform translation table.
+        :param transform_rotation: the transform rotation table.
+        :param is_outer: whether to use outer join or not.
         :return: the modified query.
         """
-        joins = {transform_table: transform_table.ID == tf_table.ID,
+        joins = {transform_table: transform_table.ID == tf_table.transform,
                  transform_translation: transform_translation.ID == transform_table.translation,
                  transform_rotation: transform_rotation.ID == transform_table.rotation}
-        self._update_joins(joins)
+        outer_joins = [transform_table, transform_translation, transform_rotation] if is_outer else None
+        self._update_joins_metadata(joins, outer_joins=outer_joins)
         return self
 
     def _join_type(self, type_table: Type[RdfType], type_of_table: Type[Base], type_of_column: Union[Column, str],
@@ -1042,6 +1077,7 @@ class NeemQuery:
     def join_neem_id_tables(self, join_table: Type[Base],
                             join_on_table: Type[Base],
                             on: Optional[Union[BinaryExpression, bool]] = None,
+                            neem_id: Optional[Column] = None,
                             is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join two tables using their neem_id columns and an additional condition specified in the on parameter.
@@ -1051,7 +1087,10 @@ class NeemQuery:
         :param is_outer: whether to use outer join or not.
         :return: The modified query.
         """
-        neem_id_cond = join_table.neem_id == join_on_table.neem_id
+        if neem_id is None:
+            neem_id_cond = join_table.neem_id == join_on_table.neem_id
+        else:
+            neem_id_cond = neem_id == join_on_table.neem_id
         cond = neem_id_cond if on is None else and_(neem_id_cond, on)
         return self.join(join_table, cond, is_outer=is_outer)
 

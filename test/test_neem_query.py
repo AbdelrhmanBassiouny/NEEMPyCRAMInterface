@@ -210,17 +210,14 @@ class TestNeemSqlAlchemy(TestCase):
         )
 
     def test_join_performer_tf_transform(self):
-        df = (self.nq.select_is_performed_by()
-              .select_performer_tf_columns()
+        df = (self.nq.select_all_performers_data()
               .select(PerformerTfTransform.ID)
               .select(PerformerTf.transform)
               .select(PerformerTfHeader.ID)
               .select(PerformerTf.header)
-              .select_performer_tf_header_columns()
-              .select_performer_base_link_name()
-              .join_performer_base_link_name()
-              .join_performer_tf_on_base_link_name()
-              .join_performer_tf_transform()
+              .select_from_tasks()
+              .join_task_time_interval()
+              .join_all_performers_data()
               .limit(100)
               ).get_result().df
         self.assertTrue(len(df) > 0)
@@ -232,16 +229,14 @@ class TestNeemSqlAlchemy(TestCase):
                         )
 
     def test_join_participant_tf_transform(self):
-        df = (self.nq.select_participant()
-              .select_participant_tf_columns()
+        df = (self.nq.select_all_participants_data()
               .select(ParticipantTfTransform.ID)
               .select(ParticipantTf.transform)
               .select(ParticipantTfHeader.ID)
               .select(ParticipantTf.header)
-              .select_participant_base_link_name()
-              .join_participant_base_link_name()
-              .join_participant_tf_on_base_link_name()
-              .join_participant_tf_transform()
+              .select_from_tasks()
+              .join_task_time_interval()
+              .join_all_participants_data()
               .limit(100)
               ).get_result().df
         self.assertTrue(len(df) > 0)
@@ -255,81 +250,32 @@ class TestNeemSqlAlchemy(TestCase):
     def test_performer_and_participant(self):
         df = (self.nq.select_task()
               .select_from_tasks()
+              .select_time_columns()
               .join_task_time_interval()
 
               ###################
               # NEEM Data
               ###################
               # .select_sql_neem_id()
-              # .join_neems()
+              # .join_neems_metadata()
               # .filter(not_(Neem.description.like("%VR%")))
               # .filter(Neem.description.like("%VR%"))
 
               ###################
               # Participants Data
               ###################
-              .select_participant()
-              .join_task_participants()
-              .select_participant_tf_columns()
-
-              # Base Link
-              .select_participant_base_link()
-              .join_participant_base_link()
-              .join_participant_tf_on_base_link()
-
-              # Base Link Name
-              # .select_participant_base_link_name()
-              # .join_participant_base_link_name()
-              # .join_participant_tf_on_base_link_name()
-
-              # Time Interval
-              # .join_participant_tf_on_time_interval(begin_offset=0)
-
-              .select_participant_tf_transform_columns()
-              .join_participant_tf_transform()
+              .select_all_participants_data()
+              .join_all_participants_data(is_outer=True)
 
               ###################
               # Performers Data
               ###################
-              .select_is_performed_by()
-              .join_task_is_performed_by()
+              .select_all_performers_data()
+              .join_all_performers_data(is_outer=True)
               # .filter(SomaIsPerformedBy.dul_Agent_o.like("%pr2%"))
-
-              .select_is_performed_by_type()
-              .join_is_performed_by_type()
-              .filter_by_performer_type(["Natural"], regexp=True)
-
-              # .select_performer_tf_columns()
-
-              # Base Link
-              # .select_performer_base_link()
-              # .join_performer_base_link()
-              # .join_performer_tf_on_base_link()
-
-              # Base Link Name
-              # .select_performer_base_link_name()
-              # .join_performer_base_link_name()
-              # .join_performer_tf_on_base_link_name()
-
-              # Time Interval
-              # .join_performer_tf_on_time_interval(begin_offset=0)
-
-              # .select_performer_tf_transform_columns()
-              # .join_performer_tf_transform()
-
-              ###################
-              # TF Data
-              ###################
-              # .select_tf_columns()
-
-              # .join_tf_on_time_interval(begin_offset=-40)
-              # .filter_tf_by_base_link()
-
-              # .join_tf_on_participant()
-
-              # .select_tf_transform_columns()
-              # .join_tf_transform()
+              # .filter_by_performer_type(["Natural"], regexp=True)
 
               .limit(100)
               ).get_result().df
+        print(df)
         self.assertTrue(len(df) > 0)
