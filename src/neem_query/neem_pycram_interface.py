@@ -16,6 +16,7 @@ from pycram.designators.object_designator import BelieveObject
 from pycram.process_module import simulated_robot
 from pycram.world import World
 from pycram.world_concepts.world_object import Object
+from src import SomaHasIntervalEnd
 from .enums import ColumnLabel as CL
 from .neem_interface import NeemInterface
 from .neem_query import NeemQuery
@@ -102,7 +103,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param pycram_neem_interface: the existing PyCRAM NEEM interface.
         :return: the new PyCRAM NEEM interface.
         """
-        return cls(pycram_neem_interface.engine.url.__str__())
+        return cls(pycram_neem_interface.engine.url.__str__().replace('***', 'password'))
 
     def redo_neem_plan(self):
         """
@@ -158,8 +159,14 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param sql_neem_id: the sql id of the NEEM.
         :return:
         """
+        curr_task_start_time = self.get_result().get_task_start_time(task, sql_neem_id)
         pni = PyCRAMNEEMInterface.from_pycram_neem_interface(self)
-        pni.query_neems_motion_replay_data()
+        df = (pni.query_tasks_semantic_data(task_parameters_necessary=False)
+         .filter_by_sql_neem_id([sql_neem_id]).filter(SomaHasIntervalEnd.o <= curr_task_start_time)).get_result().df
+        print(df)
+        # pni.query_neems_motion_replay_data()
+        return curr_task_start_time
+
 
     @staticmethod
     def get_performer_base_link(performer: str) -> str:
@@ -198,14 +205,40 @@ class PyCRAMNEEMInterface(NeemInterface):
                              for name, object_ in neem_objects.performers.items()}
         return environment_desig, participant_desigs, performer_desigs
 
-    def query_pick_actions(self, neem_id: Optional[int] = None) -> NeemQuery:
+    def query_pick_actions(self, neem_id: Optional[int] = None,
+                           task_parameters_necessary: Optional[bool] = False) -> NeemQuery:
+        """
+        Get the query to redo pick actions from neem(s) using PyCRAM.
+        The query should contain:
+         neem_id, action, participant, performed_by.
+        :param neem_id: the id of the NEEM in sql, if None, all NEEMs are considered.
+        :param task_parameters_necessary: whether to use outer join for the task parameters or not.
+        :return: the modified query.
+        """
+        self.query_tasks_semantic_data(['pick'], task_parameters_necessary=task_parameters_necessary)
+        if neem_id is not None:
+            self.filter_by_sql_neem_id([neem_id])
+        return self
+
+    def query_vr_pick_actions(self, neem_id: Optional[int] = None) -> NeemQuery:
         """
         Get the query to redo pick actions from neem(s) using PyCRAM.
         The query should contain:
          neem_id, action, participant, performed_by.
         :param neem_id: the id of the NEEM in sql, if None, all NEEMs are considered.
         """
-        self.query_tasks_semantic_data(['soma:PickingUp'], outer_join_task_parameters=False)
+        (self.query_pick_actions(neem_id, task_parameters_necessary=False)
+         .filter_by_performer_type(['Natural'], regexp=True, negate=False))
+        return self
+
+    def query_navigate_actions(self, neem_id: Optional[int] = None) -> NeemQuery:
+        """
+        Get the query to redo navigate actions from neem(s) using PyCRAM.
+        The query should contain:
+         neem_id, action, participant, performed_by.
+        :param neem_id: the id of the NEEM in sql, if None, all NEEMs are considered.
+        """
+        self.query_tasks_semantic_data(['nav'], task_parameters_necessary=False)
         if neem_id is not None:
             self.filter_by_sql_neem_id([neem_id])
         return self

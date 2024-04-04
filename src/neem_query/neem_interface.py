@@ -114,30 +114,35 @@ class NeemInterface(NeemQuery):
          .filter_by_task_types(tasks, regexp))
         return self
 
-    def query_tasks_semantic_data(self, tasks: List[str], outer_join_task_parameters: Optional[bool] = True,
+    def query_tasks_semantic_data(self, task_types: Optional[List[str]] = None,
+                                  task_parameters_necessary: Optional[bool] = False,
+                                  tasks: Optional[List[str]] = None,
                                   regexp: Optional[bool] = True) -> NeemQuery:
         """
         Get the data of a certain task from all the NEEMs.
+        :param task_types: the task type names.
+        :param task_parameters_necessary: whether to use outer join for the task parameters or not.
         :param tasks: the task names.
-        :param outer_join_task_parameters: whether to use outer join for the task parameters or not.
         :param regexp: whether to use regular expressions or not.
         :return: the query.
         """
         self.reset()
-        (self.select_neem_id().select_sql_neem_id().select_task().select_task_type().select_participant().
-         select_participant_type().select_environment().select_is_performed_by().select_is_performed_by_type()
-         .select_parameter_type().select_participant_mesh_path().
+        (self.select_neem_id().select_sql_neem_id().select_task().select_task_type()
+         .select_all_participants_semantic_data().select_environment().select_all_performers_semantic_data()
+         .select_parameter_type().select_time_columns().
          select_from_tasks().
-         join_task_types().filter_by_task_types(tasks, regexp=regexp).
-         join_task_participants(is_outer=True).
-         join_participant_types(is_outer=True).
-         join_participant_mesh_path(is_outer=True).
-         join_task_is_performed_by().join_is_performed_by_type().
-         join_all_task_parameter_data(is_outer=outer_join_task_parameters).
+         join_task_types().
+         join_all_participants_semantic_data(is_outer=True).
+         join_all_performers_semantic_data(is_outer=True).
+         join_all_task_parameter_data(is_outer=not task_parameters_necessary).
          join_task_time_interval().
          join_neems_metadata().join_neems_environment().
          order_by_interval_begin()
          )
+        if task_types is not None:
+            self.filter_by_task_types(task_types, regexp=regexp)
+        if tasks is not None:
+            self.filter_by_tasks(tasks)
         return self
 
     def query_neems_motion_replay_data(self,
@@ -160,5 +165,3 @@ class NeemInterface(NeemQuery):
          .order_by_participant_tf_stamp()
          )
         return self
-
-

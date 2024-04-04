@@ -385,14 +385,14 @@ class QueryResult:
         """
         return self.get_column_values(CL.time_interval.value, unique)
 
-    def get_time_interval_begin(self) -> List[str]:
+    def get_time_interval_begin(self) -> List[float]:
         """
         Get the time interval begin in the query result DataFrame.
         :return: the time interval begin in the NEEM.
         """
         return self.get_column_values(CL.time_interval_begin.value, False)
 
-    def get_time_interval_end(self) -> List[str]:
+    def get_time_interval_end(self) -> List[float]:
         """
         Get the time interval end in the query result DataFrame.
         :return: the time interval end in the NEEM.
@@ -483,10 +483,19 @@ class QueryResult:
         """
         return self.df.columns.tolist()
 
-    def get_sql_neem_ids(self, unique):
+    def get_sql_neem_ids(self, unique: Optional[bool] = False):
         """
         Get the SQL NEEM IDs from the query result DataFrame.
         :param unique: whether to return unique SQL NEEM IDs or not.
         :return: the SQL NEEM IDs.
         """
         return self.get_column_values(CL.neem_sql_id.value, unique=unique)
+
+    def get_task_start_time(self, task: str, sql_neem_id: int) -> float:
+        """
+        Get the start time of a task in a certain NEEM.
+        :param task: the task name.
+        :param sql_neem_id: the SQL NEEM ID.
+        :return: the start time.
+        """
+        return self.filter_by_sql_neem_id([sql_neem_id]).filter_by_task([task]).get_time_interval_begin()[0]

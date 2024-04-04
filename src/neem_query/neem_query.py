@@ -3,9 +3,8 @@ import logging
 import pandas as pd
 from sqlalchemy import (create_engine, Engine, between, and_, func, Table, BinaryExpression, select,
                         Select, not_, or_, Subquery)
-from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session, aliased
+from sqlalchemy.orm import sessionmaker, InstrumentedAttribute, Session
 from sqlalchemy.sql.selectable import NamedFromClause
-
 # noinspection PyProtectedMember
 from typing_extensions import Optional, List, Dict, Type, Union, Tuple, Any
 
@@ -1258,6 +1257,14 @@ class NeemQuery:
         """
         return self.filter(Tf.child_frame_id == ParticipantBaseLinkName.o)
 
+    def filter_by_tasks(self, tasks: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Filter the tasks by their names.
+        :param tasks: the tasks.
+        :param regexp: whether to use regex to filter the task or not (will use the sql like operator).
+        """
+        return self.filter_string_column(DulExecutesTask.dul_Task_o, tasks, regexp=regexp)
+
     def filter_by_task_types(self, tasks: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
         """
         Filter the query by task types.
@@ -1299,11 +1306,23 @@ class NeemQuery:
         :param negate: whether to negate the filter or not.
         :return: the modified query.
         """
+        return self.filter_string_column(type_table.o, types, regexp=regexp, negate=negate)
+
+    def filter_string_column(self, filter_col: Union[Column, str], values: List[str], regexp: Optional[bool] = False,
+                             negate: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Filter the query by type.
+        :param filter_col: the column to filter on.
+        :param values: the values to include/exclude.
+        :param regexp: whether to use regex to filter the type or not (will use the sql like operator).
+        :param negate: whether to negate the filter or not.
+        :return: the modified query.
+        """
         if regexp:
-            cond = [type_table.o.like(f"%{t}%") for t in types]
+            cond = [filter_col.like(f"%{v}%") for v in values]
+            cond = or_(*cond)
         else:
-            cond = [type_table.o == t for t in types]
-        cond = or_(*cond)
+            cond = filter_col.in_(values)
         if negate:
             cond = not_(cond)
         self.filters.append(cond)
