@@ -95,16 +95,14 @@ class TestNeemInterface(TestCase):
         self.assertTrue(len(df) > 0)
 
     def test_get_abhijit_pouring_tfs(self):
-        (self.ni.select_tf_columns().select(Neem.created_by).select_participant_type().select_task_type().
-         select_tf_transform_columns().
+        (self.ni.select(Neem.created_by).select_all_participants_data().select_task_type().
          select_from_tasks().
          join_task_time_interval().
-         join_tf_on_time_interval(begin_offset=0).join_tf_transform().
+         join_all_participants_data().
          join_task_types().filter_by_task_types(['Pour'], regexp=True).
-         join_all_participants_semantic_data().filter_tf_by_participant_base_link().
          join_neems_metadata().
-         filter(Neem.created_by.in_(['Abhijit Vyas', 'Abhijit'])).
-         limit(100)
+         filter(Neem.created_by.in_(['Abhijit Vyas', 'Abhijit']))
+         .limit(100)
          )
         qr = self.ni.get_result()
         df = qr.df

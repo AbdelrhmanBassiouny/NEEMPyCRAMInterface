@@ -434,7 +434,7 @@ class NeemQuery:
         :param tables: the tables.
         :return: the modified query.
         """
-        self._update_select_from_tables(tables)
+        self._update_select_from_tables(*tables)
         return self
 
     def distinct(self) -> 'NeemQuery':
@@ -704,8 +704,10 @@ class NeemQuery:
         :return: the modified query.
         """
         return self._join_entity_tf_on_time_interval_and_frame_id(self.participant_tf_view,
-                                                                  ParticipantBaseLink.urdf_Link_o, begin_offset,
-                                                                  end_offset, is_outer=is_outer)
+                                                                  func.substring_index(ParticipantBaseLink.urdf_Link_o,
+                                                                                       ':', -1),
+                                                                  begin_offset, end_offset,
+                                                                  is_outer=is_outer)
 
     def join_participant_tf_on_base_link(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
