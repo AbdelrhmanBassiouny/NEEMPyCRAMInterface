@@ -118,7 +118,7 @@ class PyCRAMNEEMInterface(NeemInterface):
                                                                         tasks,
                                                                         self.get_result().get_column_value_per_neem(
                                                                             CL.task_parameter.value),
-                                                                        self.get_stamp()):
+                                                                        self.get_participant_stamp()):
             # TODO: Implement neem_task_goal_resolver to get task goal like placing goal.
             # TODO: Create designators for objects.
             if task in self.soma_to_pycram_actions:
@@ -219,7 +219,7 @@ class PyCRAMNEEMInterface(NeemInterface):
 
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
 
-        motion_data = self.get_motion_data(query_result)
+        motion_data = self.get_participant_motion_data(query_result)
         poses = motion_data.poses
         times = motion_data.times
         participant_instances = motion_data.participant_instances
@@ -234,14 +234,14 @@ class PyCRAMNEEMInterface(NeemInterface):
             prev_time = current_time
             participant_objects[participant].set_pose(pose)
 
-    def get_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
+    def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
         Get motion data required to replay motions from the query result.
         :param query_result: the query result to get the motion data from.
         """
         query_result = query_result if query_result is not None else self.get_result()
-        poses = self.get_poses(query_result)
-        times = self.get_stamp(query_result)
+        poses = self.get_participant_poses(query_result)
+        times = self.get_participant_stamp(query_result)
         participant_instances = self.get_participants(query_result=query_result, unique=False)
         return ReplayNEEMMotionData(poses, times, participant_instances)
 
@@ -314,7 +314,7 @@ class PyCRAMNEEMInterface(NeemInterface):
             entity_name = entity
             if ':' in entity_name:
                 entity_name = entity_name.split(':')[-1]
-            object_names = World.current_world.get_object_names()
+            object_names = [obj.name for obj in World.current_world.objects]
             if entity in object_names:
                 entity_name = f'{entity}_{object_names.count(entity)}'
             entity_object = Object(entity_name, object_type_getter(entity), description)
@@ -504,7 +504,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         return mesh_link
 
     @staticmethod
-    def download_mesh_file(mesh_link: str) -> str:
+    def download_mesh_file(mesh_link: str) -> Union[str, None]:
         """
         Download the mesh file.
         :param mesh_link: The link of the mesh file.
@@ -512,10 +512,16 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         file_name = mesh_link.split('/')[-1]
         download_path = os.path.join('/tmp', file_name)
-        with request.urlopen(mesh_link, timeout=1) as response:
-            with open(download_path, 'wb') as file:
-                shutil.copyfileobj(response, file)
-        return download_path
+        try:
+            with request.urlopen(mesh_link, timeout=1) as response:
+                with open(download_path, 'wb') as file:
+                    shutil.copyfileobj(response, file)
+            while not os.path.exists(download_path):
+                pass
+            return download_path
+        except Exception as e:
+            logging.warning(f'Failed to download file from {mesh_link}. Error: {e}')
+            return None
 
     @staticmethod
     def get_description_of_environment(environment: str) -> str:
@@ -547,42 +553,42 @@ class PyCRAMNEEMInterface(NeemInterface):
         else:
             return ObjectType.GENERIC_OBJECT
 
-    def get_transforms(self, query_result: Optional[QueryResult] = None) -> List[Transform]:
+    def get_participant_transforms(self, query_result: Optional[QueryResult] = None) -> List[Transform]:
         """
         Get transforms from the query result.
         :return: the transforms as a list.
         """
         query_result = query_result if query_result is not None else self.get_result()
-        position = query_result.get_positions()
-        orientation = query_result.get_orientations()
-        frame_id = query_result.get_frame_id()
-        child_frame_id = query_result.get_child_frame_id()
+        position = query_result.get_participant_positions()
+        orientation = query_result.get_participant_orientations()
+        frame_id = query_result.get_participant_frame_id()
+        child_frame_id = query_result.get_participant_child_frame_id()
         transforms = [Transform([x, y, z], [rx, ry, rz, rw], frame_id, child_frame_id, time=rospy.Time())
                       for x, y, z, rx, ry, rz, rw, frame_id, child_frame_id in
                       zip(*position, *orientation, frame_id, child_frame_id)]
         return transforms
 
-    def get_poses(self, query_result: Optional[QueryResult] = None) -> List[Pose]:
+    def get_participant_poses(self, query_result: Optional[QueryResult] = None) -> List[Pose]:
         """
         Get poses from the query result.
         :param query_result: the query result to get the poses from.
         :return: the poses as a list.
         """
         query_result = query_result if query_result is not None else self.get_result()
-        positions = query_result.get_positions()
-        orientations = query_result.get_orientations()
+        positions = query_result.get_participant_positions()
+        orientations = query_result.get_participant_orientations()
         poses = [Pose([x, y, z], [rx, ry, rz, rw])
                  for x, y, z, rx, ry, rz, rw in zip(*positions, *orientations)]
         return poses
 
-    def get_stamp(self, query_result: Optional[QueryResult] = None) -> List[float]:
+    def get_participant_stamp(self, query_result: Optional[QueryResult] = None) -> List[float]:
         """
         Get times from the query result DataFrame.
         :param query_result: the query result to get the times from.
         :return: the time stamps as a list.
         """
         query_result = query_result if query_result is not None else self.get_result()
-        return query_result.get_stamp()
+        return query_result.get_participant_stamp()
 
     def get_participants(self, unique: Optional[bool] = True,
                          query_result: Optional[QueryResult] = None) -> List[str]:

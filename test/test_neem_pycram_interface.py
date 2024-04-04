@@ -66,21 +66,21 @@ class TestNeemPycramInterface(TestCase):
 
     def test_get_poses(self):
         self.get_pouring_action_data()
-        poses = self.pni.get_poses()
+        poses = self.pni.get_participant_poses()
         self.assertIsInstance(poses, list)
         self.assertTrue(len(poses) > 0)
         self.assertIsInstance(poses[0], Pose)
 
     def test_get_transforms(self):
         self.get_pouring_action_data()
-        transforms = self.pni.get_transforms()
+        transforms = self.pni.get_participant_transforms()
         self.assertIsInstance(transforms, list)
         self.assertTrue(len(transforms) > 0)
         self.assertIsInstance(transforms[0], Transform)
 
     def test_get_stamp(self):
         self.get_pouring_action_data()
-        stamps = self.pni.get_stamp()
+        stamps = self.pni.get_participant_stamp()
         self.assertIsInstance(stamps, list)
         self.assertTrue(len(stamps) > 0)
         self.assertIsInstance(stamps[0], float)
@@ -89,7 +89,7 @@ class TestNeemPycramInterface(TestCase):
         (self.pni.query_neems_motion_replay_data().
          filter_by_task_types(['Pour'], regexp=True)
          .filter_by_participant_type(['soma:DesignedContainer']))
-        motion_data: ReplayNEEMMotionData = self.pni.get_motion_data()
+        motion_data: ReplayNEEMMotionData = self.pni.get_participant_motion_data()
         self.assertEqual(len(motion_data.poses), len(motion_data.times))
         self.assertEqual(len(motion_data.times), len(motion_data.participant_instances))
         self.assertTrue(len(motion_data.poses) > 0)

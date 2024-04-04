@@ -1198,6 +1198,13 @@ class NeemQuery:
         """
         return self.order_by(TfHeader.stamp)
 
+    def order_by_participant_tf_stamp(self) -> 'NeemQuery':
+        """
+        Order the query results by the participant tf header stamp column.
+        :return: the modified query.
+        """
+        return self.order_by(self.participant_tf_view.stamp)
+
     def order_by_interval_begin(self) -> 'NeemQuery':
         """
         Order the query results by the soma interval begin column.

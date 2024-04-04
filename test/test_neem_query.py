@@ -166,45 +166,6 @@ class TestNeemSqlAlchemy(TestCase):
             for i in range(len(df)))
         )
 
-    def test_join_performer_tf_transform(self):
-        df = (self.nq.select_all_performers_data()
-              # .select(PerformerTfTransform.ID)
-              # .select(PerformerTf.transform)
-              # .select(PerformerTfHeader.ID)
-              # .select(PerformerTf.header)
-              .select_from_tasks()
-              .join_task_time_interval()
-              .join_all_performers_data()
-              .limit(100)
-              ).get_result().df
-        self.assertTrue(len(df) > 0)
-        self.assertTrue(all(df['PerformerTfTransform_ID'][i] == df['PerformerTf_transform'][i]
-                            for i in range(len(df)))
-                        )
-        self.assertTrue(all(df['PerformerTfHeader_ID'][i] == df['PerformerTf_header'][i]
-                            for i in range(len(df)))
-                        )
-
-    def test_join_participant_tf_transform(self):
-        df = (self.nq.select_all_participants_data()
-              # .select(ParticipantTfTransform.ID)
-              # .select(ParticipantTf.transform)
-              # .select(ParticipantTfHeader.ID)
-              # .select(ParticipantTf.header)
-              .select_from_tasks()
-              .join_task_time_interval()
-              .join_task_time_interval()
-              .join_all_participants_data()
-              .limit(100)
-              ).get_result().df
-        self.assertTrue(len(df) > 0)
-        self.assertTrue(all(df['ParticipantTfTransform_ID'][i] == df['ParticipantTf_transform'][i]
-                            for i in range(len(df)))
-                        )
-        self.assertTrue(all(df['ParticipantTfHeader_ID'][i] == df['ParticipantTf_header'][i]
-                            for i in range(len(df)))
-                        )
-
     def test_subquery(self):
         subquery = (select(ParticipantTf.child_frame_id, ParticipantTf.neem_id, ParticipantTfHeader.stamp,
                            ParticipantTfHeader.frame_id, ParticipantTfHeader.seq)

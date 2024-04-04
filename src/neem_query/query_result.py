@@ -251,43 +251,43 @@ class QueryResult:
         """
         return self.get_column_values(CL.environment.value, unique=unique, drop_na=drop_na)
 
-    def get_stamp(self) -> List[float]:
+    def get_participant_stamp(self) -> List[float]:
         """
         Get times from the query result DataFrame.
         :return: the time stamps as a list.
         """
-        return self.df[CL.stamp.value].tolist()
+        return self.df[CL.participant_stamp.value].tolist()
 
-    def get_child_frame_id(self) -> List[str]:
+    def get_participant_child_frame_id(self) -> List[str]:
         """
         Get child_frame_id from the query result DataFrame.
         :return: the child_frame_ids as a list.
         """
-        return self.df[CL.child_frame_id.value].tolist()
+        return self.df[CL.participant_child_frame_id.value].tolist()
 
-    def get_frame_id(self) -> List[str]:
+    def get_participant_frame_id(self) -> List[str]:
         """
         Get frame_id from the query result DataFrame.
         :return: the frame_ids as a list.
         """
-        return self.df[CL.frame_id.value].tolist()
+        return self.df[CL.participant_frame_id.value].tolist()
 
-    def get_positions(self) -> Tuple[List[float], List[float], List[float]]:
+    def get_participant_positions(self) -> Tuple[List[float], List[float], List[float]]:
         """
         Get positions from the query result DataFrame.
         :return: the positions as 3 lists for x, y, and z values.
         """
-        return (self.df[CL.translation_x.value].tolist(), self.df[CL.translation_y.value].tolist(),
-                self.df[CL.translation_z.value].tolist())
+        return (self.df[CL.participant_translation_x.value].tolist(), self.df[CL.participant_translation_y.value].tolist(),
+                self.df[CL.participant_translation_z.value].tolist())
 
-    def get_orientations(self) -> Tuple[List[float], List[float], List[float], List[float]]:
+    def get_participant_orientations(self) -> Tuple[List[float], List[float], List[float], List[float]]:
         """
         Get orientations from the query result DataFrame.
         :return: the orientations.
         """
-        return (self.df[CL.orientation_x.value].tolist(), self.df[CL.orientation_y.value].tolist(),
-                self.df[CL.orientation_z.value].tolist(),
-                self.df[CL.orientation_w.value].tolist())
+        return (self.df[CL.participant_orientation_x.value].tolist(), self.df[CL.participant_orientation_y.value].tolist(),
+                self.df[CL.participant_orientation_z.value].tolist(),
+                self.df[CL.participant_orientation_w.value].tolist())
 
     def get_all_subtask_types_of_task_type(self, task_type: str,
                                            unique: Optional[bool] = True,

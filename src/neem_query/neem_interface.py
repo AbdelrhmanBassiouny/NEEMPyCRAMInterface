@@ -101,15 +101,17 @@ class NeemInterface(NeemQuery):
          order_by_interval_begin())
         return self
 
-    def query_task_data(self, tasks: List[str],
+    def query_task_data(self, tasks: List[str], participant_necessary: Optional[bool] = False,
                         regexp: Optional[bool] = False) -> NeemQuery:
         """
         Get the data of a certain task from all the NEEMs.
         :param tasks: the task names.
+        :param participant_necessary: whether to only include tasks that have a participant or not.
         :param regexp: whether to use regular expressions or not.
         :return: the query.
         """
-        self.query_neems_motion_replay_data().filter_by_task_types(tasks, regexp)
+        (self.query_neems_motion_replay_data(participant_necessary=participant_necessary)
+         .filter_by_task_types(tasks, regexp))
         return self
 
     def query_tasks_semantic_data(self, tasks: List[str], outer_join_task_parameters: Optional[bool] = True,
@@ -139,8 +141,7 @@ class NeemInterface(NeemQuery):
         return self
 
     def query_neems_motion_replay_data(self,
-                                       participant_necessary: Optional[bool] = False,
-                                       filter_tf_by_base_link: Optional[bool] = True) -> NeemQuery:
+                                       participant_necessary: Optional[bool] = True) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
@@ -149,17 +150,15 @@ class NeemInterface(NeemQuery):
         :return: the query.
         """
         self.reset()
-        (self.select_all_performers_data().
+        (self.select_all_participants_data().
          select_neem_id().select_environment().
          select_from_tasks().
          join_task_types().
          join_task_time_interval().
          join_all_participants_data(is_outer=not participant_necessary).
          join_neems_metadata().join_neems_environment()
-         .order_by(ParticipantTfHeader.stamp)
+         .order_by_participant_tf_stamp()
          )
-        if filter_tf_by_base_link:
-            self.filter_tf_by_participant_base_link()
         return self
 
 
