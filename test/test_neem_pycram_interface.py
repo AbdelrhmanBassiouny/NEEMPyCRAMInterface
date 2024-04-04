@@ -2,6 +2,7 @@ from unittest import TestCase, skipIf
 
 from neem_query.neem_pycram_interface import PyCRAMNEEMInterface, ReplayNEEMMotionData
 from neem_query.query_result import QueryResult
+from neem_query.enums import ColumnLabel as CL
 
 pycram_not_found = False
 try:
@@ -129,10 +130,27 @@ class TestNeemPycramInterface(TestCase):
             self.assertTrue(f.read() is not None)
 
     def test_query_pick_actions(self):
-        qr = self.pni.query_pick_actions().select_task_type().get_result()
-        df = qr.df
+        df = self.pni.query_pick_actions().get_result().df
         self.assertTrue(len(df) > 0)
         self.assertTrue(all(df['task_type'] == 'soma:PickingUp'))
+
+    def test_query_vr_pick_actions(self):
+        df = self.pni.query_vr_pick_actions().get_result().df
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.is_performed_by_type.value] == 'dul:NaturalPerson'))
+
+    def test_query_navigate_actions(self):
+        df = self.pni.query_navigate_actions().get_result().df
+        print(df)
+        self.assertTrue(len(df) > 0)
+        self.assertTrue(all(df[CL.task_type.value] == 'soma:Navigating'))
+
+    def test_get_pre_task_state(self):
+        qr = self.pni.query_tasks_semantic_data(['pick'], regexp=True).get_result()
+        task = qr.get_tasks()[0]
+        sql_neem_id = qr.get_sql_neem_ids()[0]
+        state = self.pni.get_pre_task_state(task, sql_neem_id)
+        print(state)
 
     def test_redo_pick_action_for_neem(self):
         self.pni.redo_pick_action()
