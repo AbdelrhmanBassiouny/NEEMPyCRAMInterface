@@ -116,24 +116,38 @@ class NeemInterface(NeemQuery):
 
     def query_tasks_semantic_data(self, task_types: Optional[List[str]] = None,
                                   task_parameters_necessary: Optional[bool] = False,
+                                  participant_base_link_necessary: Optional[bool] = False,
+                                  performer_base_link_necessary: Optional[bool] = False,
+                                  participant_necessary: Optional[bool] = False,
+                                  performer_necessary: Optional[bool] = False,
                                   tasks: Optional[List[str]] = None,
-                                  regexp: Optional[bool] = True) -> NeemQuery:
+                                  regexp: Optional[bool] = True,
+                                  select_columns: Optional[bool] = True) -> NeemQuery:
         """
         Get the data of a certain task from all the NEEMs.
         :param task_types: the task type names.
         :param task_parameters_necessary: whether to use outer join for the task parameters or not.
+        :param participant_base_link_necessary: whether to use outer join for the participant base link or not.
+        :param performer_base_link_necessary: whether to use outer join for the performer base link or not.
+        :param participant_necessary: whether to only include tasks that have a participant or not.
+        :param performer_necessary: whether to only include tasks that have a performer or not.
         :param tasks: the task names.
         :param regexp: whether to use regular expressions or not.
+        :param select_columns: whether to select the columns or not.
         :return: the query.
         """
         self.reset()
-        (self.select_neem_id().select_sql_neem_id().select_task().select_task_type()
-         .select_all_participants_semantic_data().select_environment().select_all_performers_semantic_data()
-         .select_parameter_type().select_time_columns().
+        if select_columns:
+            (self.select_neem_id().select_sql_neem_id().select_task().select_task_type()
+             .select_all_participants_semantic_data().select_environment().select_all_performers_semantic_data()
+             .select_parameter_type().select_time_columns())
+        (self.
          select_from_tasks().
          join_task_types().
-         join_all_participants_semantic_data(is_outer=True).
-         join_all_performers_semantic_data(is_outer=True).
+         join_all_participants_semantic_data(is_outer=not participant_necessary,
+                                             base_link_is_outer=not participant_base_link_necessary).
+         join_all_performers_semantic_data(is_outer=not performer_necessary,
+                                           base_link_is_outer=not performer_base_link_necessary).
          join_all_task_parameter_data(is_outer=not task_parameters_necessary).
          join_task_time_interval().
          join_neems_metadata().join_neems_environment().
@@ -145,18 +159,15 @@ class NeemInterface(NeemQuery):
             self.filter_by_tasks(tasks)
         return self
 
-    def query_neems_motion_replay_data(self,
-                                       participant_necessary: Optional[bool] = True) -> NeemQuery:
+    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = True) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
-        :param performer_necessary: whether to only include tasks that have a performer or not.
-        :param filter_tf_by_base_link: whether to filter the TFs by the base link or not.
         :return: the query.
         """
         self.reset()
         (self.select_all_participants_data().
-         select_neem_id().select_environment().
+         select_neem_id().select_environment().select_sql_neem_id().
          select_from_tasks().
          join_task_types().
          join_task_time_interval().

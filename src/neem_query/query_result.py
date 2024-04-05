@@ -499,3 +499,20 @@ class QueryResult:
         :return: the start time.
         """
         return self.filter_by_sql_neem_id([sql_neem_id]).filter_by_task([task]).get_time_interval_begin()[0]
+
+    def get_task_end_time(self, task: str, sql_neem_id: int) -> float:
+        """
+        Get the end time of a task in a certain NEEM.
+        :param task: the task name.
+        :param sql_neem_id: the SQL NEEM ID.
+        :return: the end time.
+        """
+        return self.filter_by_sql_neem_id([sql_neem_id]).filter_by_task([task]).get_time_interval_end()[0]
+
+    def order_by(self, df_column_name: str):
+        """
+        Order the query result DataFrame by a certain column.
+        :param df_column_name: the column name to order by.
+        """
+        self.df = self.df.sort_values(by=df_column_name)
+        return self

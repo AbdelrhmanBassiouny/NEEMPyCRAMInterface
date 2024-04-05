@@ -613,15 +613,17 @@ class NeemQuery:
          )
         return self
 
-    def join_all_participants_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_all_participants_semantic_data(self, is_outer: Optional[bool] = False,
+                                            base_link_is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the participants' data.
         :param is_outer: whether to use outer join or not.
+        :param base_link_is_outer: whether to use outer join for the base link or not.
         :return: the modified query.
         """
         (self.join_task_participants(is_outer=is_outer).
          join_participant_types(is_outer=is_outer).
-         join_participant_base_link(is_outer=is_outer).
+         join_participant_base_link(is_outer=base_link_is_outer).
          # join_participant_base_link_name(is_outer=is_outer).
          join_participant_mesh_path(is_outer=True))
         return self
@@ -752,15 +754,17 @@ class NeemQuery:
          )
         return self
 
-    def join_all_performers_semantic_data(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+    def join_all_performers_semantic_data(self, is_outer: Optional[bool] = False,
+                                          base_link_is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the performers' data.
         :param is_outer: whether to use outer join or not.
+        :param base_link_is_outer: whether to use outer join for the base link or not.
         :return: the NEEMs as a pandas dataframe.
         """
         (self.join_task_is_performed_by(is_outer=is_outer).
          join_is_performed_by_type(is_outer=is_outer).
-         join_performer_base_link_name(is_outer=True))
+         join_performer_base_link_name(is_outer=base_link_is_outer))
         return self
 
     def join_task_is_performed_by(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
