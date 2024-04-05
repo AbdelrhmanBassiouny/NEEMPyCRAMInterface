@@ -598,15 +598,17 @@ class NeemQuery:
 
     def join_all_participants_data(self, is_outer: Optional[bool] = False,
                                    begin_offset: Optional[float] = 0,
-                                   end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                   end_offset: Optional[float] = 0,
+                                   base_link_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the participants' semantic data and the tf data.
         :param is_outer: whether to use outer join or not.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
+        :param base_link_outer: whether to use outer join for the base link or not.
         :return: the modified query.
         """
-        (self.join_all_participants_semantic_data(is_outer=is_outer)
+        (self.join_all_participants_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_outer)
          .join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
                                                is_outer=is_outer)
          # .join_participant_tf_transform(is_outer=is_outer)
@@ -740,15 +742,17 @@ class NeemQuery:
 
     def join_all_performers_data(self, is_outer: Optional[bool] = False,
                                  begin_offset: Optional[float] = 0,
-                                 end_offset: Optional[float] = 0) -> 'NeemQuery':
+                                 end_offset: Optional[float] = 0,
+                                 base_link_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the performers' data.
         :param is_outer: whether to use outer join or not.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
+        :param base_link_outer: whether to use outer join for the base link or not.
         :return: the NEEMs as a pandas dataframe.
         """
-        (self.join_all_performers_semantic_data(is_outer=is_outer)
+        (self.join_all_performers_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_outer)
          .join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
                                              is_outer=is_outer)
          )

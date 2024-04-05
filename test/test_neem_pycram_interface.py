@@ -39,7 +39,7 @@ class TestNeemPycramInterface(TestCase):
         self.pni.reset()
 
     def get_pouring_action_data(self):
-        self.neem_qr = (self.pni.query_task_data(['Pour'], regexp=True).
+        self.neem_qr = (self.pni.query_task_motion_data(['Pour'], regexp=True).
                         filter_by_participant_type(['soma:DesignedContainer']).
                         limit(100).get_result())
 
@@ -157,15 +157,22 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(all(df[CL.task_type.value] == 'soma:Navigating'))
 
     def test_get_pre_task_state(self):
-        qr = self.pni.query_tasks_semantic_data(['pour']).get_result()
+        qr = self.pni.query_tasks_semantic_data(['pick']).get_result()
         task = qr.get_tasks()[0]
         sql_neem_id = qr.get_sql_neem_ids()[0]
         state = self.pni.get_pre_task_state(task, sql_neem_id)
         self.assertIsInstance(state, pd.DataFrame)
         self.assertTrue(len(state) > 0)
 
+    def test_query_all_task_data(self):
+        q = self.pni.query_all_task_data(['pour'])
+        print(q.construct_query())
+        df = q.get_result().df
+        self.assertTrue(len(df) > 0)
+
     def test_query_transport_actions(self):
-        df = self.pni.query_transport_actions().get_result().df
+        q = self.pni.query_transport_actions()
+        df = q.get_result().df
         self.assertTrue(len(df) > 0)
         self.assertTrue(all(df[CL.task_type.value] == 'soma:Transporting'))
 

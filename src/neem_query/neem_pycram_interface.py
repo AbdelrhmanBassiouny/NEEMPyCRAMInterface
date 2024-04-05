@@ -40,18 +40,6 @@ class ReplayNEEMMotionData:
 
 
 @dataclass
-class NEEMObjectMetadata:
-    """
-    A data class to holds a NEEM object's metadata.
-    """
-    neem_id: str
-    object_name: str
-
-    def __hash__(self):
-        return hash((self.neem_id, self.object_name))
-
-
-@dataclass
 class NEEMObjects:
     """
     A data class to hold the pycram objects in the NEEM.
@@ -90,9 +78,8 @@ class PyCRAMNEEMInterface(NeemInterface):
     """
     A class to interface with the NEEM database and PyCRAM.
     """
-    data_dirs: Optional[List[str]] = [os.path.join(os.path.dirname(__file__), '..', '..', 'resources'), '/tmp']
-    for data_dir in data_dirs:
-        World.add_resource_path(data_dir)
+    data_dir: Optional[str] = os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
+    World.add_resource_path(data_dir)
 
     action_designator_inspector = ModuleInspector(action_designator.__name__)
     pycram_actions = action_designator_inspector.get_all_classes_dict()
@@ -720,15 +707,14 @@ class PyCRAMNEEMInterface(NeemInterface):
             mesh_link = mesh_path
         return mesh_link
 
-    @staticmethod
-    def download_mesh_file(mesh_link: str) -> Union[str, None]:
+    def download_mesh_file(self, mesh_link: str) -> Union[str, None]:
         """
         Download the mesh file.
         :param mesh_link: The link of the mesh file.
         :return: The download path of the mesh file.
         """
         file_name = mesh_link.split('/')[-1]
-        download_path = os.path.join('/tmp', file_name)
+        download_path = os.path.join(self.data_dir, file_name)
         try:
             with request.urlopen(mesh_link, timeout=1) as response:
                 with open(download_path, 'wb') as file:
