@@ -132,7 +132,7 @@ class NeemInterface(NeemQuery):
             self.select_all_participants_data().select_all_performers_data()
         (self.
          join_all_participants_data(is_outer=not participant_necessary,
-                                    base_link_outer=not participant_base_link_necessary).
+                                    base_link_is_outer=not participant_base_link_necessary).
          join_all_performers_data(is_outer=not performer_necessary,
                                   base_link_outer=not performer_base_link_necessary)
          )
@@ -202,13 +202,14 @@ class NeemInterface(NeemQuery):
         :return: the query.
         """
         self.reset()
-        (self.select_all_participants_data().
+        (self.select_all_participants_semantic_data().select_tf_columns().select_tf_transform_columns().
          select_neem_id().select_environment().select_sql_neem_id().
          select_from_tasks().
          join_task_types().
+         join_all_participants_semantic_data(is_outer=not participant_necessary, base_link_is_outer=True).
          join_task_time_interval().
-         join_all_participants_data(is_outer=not participant_necessary).
+         join_tf_on_time_interval().
          join_neems_metadata().join_neems_environment()
-         .order_by_participant_tf_stamp()
+         .order_by_tf_stamp()
          )
         return self

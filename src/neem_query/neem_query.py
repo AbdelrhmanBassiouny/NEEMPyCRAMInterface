@@ -130,79 +130,65 @@ class NeemQuery:
         Select tf data (transform, header, child_frame_id) to the query,
         :return: the modified query.
         """
-        return self._select_entity_tf_columns(Tf, TfHeader)
-
-    def select_tf_header_columns(self) -> 'NeemQuery':
-        """
-        Select tf header data (frame_id, stamp) to the query,
-        :return: the modified query.
-        """
-        return self._select_entity_tf_header_columns(TfHeader)
+        return self._select_entity_tf_view_columns(self.tf_view)
 
     def select_performer_tf_columns(self) -> 'NeemQuery':
         """
         Select performer tf data (transform, header, child_frame_id) to the query,
         :return: the modified query.
         """
-        return self._update_selected_columns([self.performer_tf_view.child_frame_id,
-                                              self.performer_tf_view.frame_id,
-                                              self.performer_tf_view.stamp])
-
-    def select_performer_tf_header_columns(self) -> 'NeemQuery':
-        """
-        Select performer tf header data (frame_id, stamp) to the query,
-        :return: the modified query.
-        """
-        return self._select_entity_tf_header_columns(PerformerTfHeader)
+        return self._select_entity_tf_view_columns(self.performer_tf_view)
 
     def select_participant_tf_columns(self) -> 'NeemQuery':
         """
         Select participant tf data (transform, header, child_frame_id) to the query,
         :return: the modified query.
         """
-        return self._update_selected_columns([self.participant_tf_view.child_frame_id,
-                                              self.participant_tf_view.frame_id,
-                                              self.participant_tf_view.stamp])
+        return self._select_entity_tf_view_columns(self.participant_tf_view)
 
-    def select_participant_tf_header_columns(self) -> 'NeemQuery':
+    def _select_entity_tf_view_columns(self, entity_tf_view: NamedFromClause) -> 'NeemQuery':
         """
-        Select participant tf header data (frame_id, stamp) to the query,
+        Select tf table columns of the tf view to the query.
+        :param entity_tf_view: the tf view table.
         :return: the modified query.
         """
-        return self._select_entity_tf_header_columns(ParticipantTfHeader)
+        return self._update_selected_columns([entity_tf_view.child_frame_id,
+                                              entity_tf_view.frame_id,
+                                              entity_tf_view.stamp])
 
     def select_tf_transform_columns(self) -> 'NeemQuery':
         """
         Select tf transform data (translation, rotation).
         :return: the modified query.
         """
-        return self._select_entity_tf_transform_columns(TransformTranslation, TransformRotation)
+        return self._select_entity_tf_transform_columns_from_tf_view(self.tf_view)
 
     def select_performer_tf_transform_columns(self) -> 'NeemQuery':
         """
         Select performer tf transform data (translation, rotation).
         :return: the modified query.
         """
-        return self._update_selected_columns([self.performer_tf_view.x,
-                                              self.performer_tf_view.y,
-                                              self.performer_tf_view.z,
-                                              self.performer_tf_view.qx,
-                                              self.performer_tf_view.qy,
-                                              self.performer_tf_view.qz,
-                                              self.performer_tf_view.qw])
+        return self._select_entity_tf_transform_columns_from_tf_view(self.performer_tf_view)
 
     def select_participant_tf_transform_columns(self) -> 'NeemQuery':
         """
         Select participant tf transform data (translation, rotation).
         :return: the modified query.
         """
-        return self._update_selected_columns([self.participant_tf_view.x,
-                                              self.participant_tf_view.y,
-                                              self.participant_tf_view.z,
-                                              self.participant_tf_view.qx,
-                                              self.participant_tf_view.qy,
-                                              self.participant_tf_view.qz,
-                                              self.participant_tf_view.qw])
+        return self._select_entity_tf_transform_columns_from_tf_view(self.participant_tf_view)
+
+    def _select_entity_tf_transform_columns_from_tf_view(self, entity_tf_view: NamedFromClause) -> 'NeemQuery':
+        """
+        Select tf transform data (translation, rotation).
+        :return: the modified query.
+        """
+        return self._update_selected_columns([entity_tf_view.x,
+                                              entity_tf_view.y,
+                                              entity_tf_view.z,
+                                              entity_tf_view.qx,
+                                              entity_tf_view.qy,
+                                              entity_tf_view.qz,
+                                              entity_tf_view.qw])
 
     def select_time_columns(self) -> 'NeemQuery':
         """
@@ -599,19 +585,18 @@ class NeemQuery:
     def join_all_participants_data(self, is_outer: Optional[bool] = False,
                                    begin_offset: Optional[float] = 0,
                                    end_offset: Optional[float] = 0,
-                                   base_link_outer: Optional[bool] = False) -> 'NeemQuery':
+                                   base_link_is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the participants' semantic data and the tf data.
         :param is_outer: whether to use outer join or not.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
-        :param base_link_outer: whether to use outer join for the base link or not.
+        :param base_link_is_outer: whether to use outer join for the base link or not.
         :return: the modified query.
         """
-        (self.join_all_participants_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_outer)
+        (self.join_all_participants_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_is_outer)
          .join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
                                                is_outer=is_outer)
-         # .join_participant_tf_transform(is_outer=is_outer)
          )
         return self
 
@@ -697,17 +682,23 @@ class NeemQuery:
 
     def join_participant_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
                                              end_offset: Optional[float] = 0,
-                                             is_outer: Optional[bool] = False) -> 'NeemQuery':
+                                             is_outer: Optional[bool] = False,
+                                             use_participant_name_as_link_name: Optional[bool] = False) -> 'NeemQuery':
         """
         Add participant tf data (transform, header, child_frame_id) to the query,
         Assumes SomaHasIntervalBegin, SomaHasIntervalEnd, and ParticipantBaseLinkName have been joined/selected already.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
         :param is_outer: whether to use outer join or not.
+        :param use_participant_name_as_link_name: whether to use the participant name as the link name or not.
         :return: the modified query.
         """
+        if use_participant_name_as_link_name:
+            link_name = DulHasParticipant.dul_Object_o
+        else:
+            link_name = ParticipantBaseLink.urdf_Link_o
         return self._join_entity_tf_on_time_interval_and_frame_id(self.participant_tf_view,
-                                                                  func.substring_index(ParticipantBaseLink.urdf_Link_o,
+                                                                  func.substring_index(link_name,
                                                                                        ':', -1),
                                                                   begin_offset, end_offset,
                                                                   is_outer=is_outer)
@@ -1198,12 +1189,12 @@ class NeemQuery:
         self._limit = limit
         return self
 
-    def order_by_stamp(self) -> 'NeemQuery':
+    def order_by_tf_stamp(self) -> 'NeemQuery':
         """
         Order the query results by the tf header stamp column.
         :return: the modified query.
         """
-        return self.order_by(TfHeader.stamp)
+        return self.order_by(self.tf_view.stamp)
 
     def order_by_participant_tf_stamp(self) -> 'NeemQuery':
         """
@@ -1264,6 +1255,23 @@ class NeemQuery:
         :return: the modified query.
         """
         return self.filter(Tf.child_frame_id == ParticipantBaseLinkName.o)
+
+    def filter_tf_by_child_frame_id(self, child_frame_id: Union[str, Column]) -> 'NeemQuery':
+        """
+        Filter the tf data by child frame id.
+        :param child_frame_id: the child frame id.
+        :return: the modified query.
+        """
+        return self._filter_entity_tf_by_child_frame_id(self.tf_view, child_frame_id)
+
+    def _filter_entity_tf_by_child_frame_id(self, entity_tf_view: NamedFromClause,
+                                            child_frame_id: Union[str, Column]) -> 'NeemQuery':
+        """
+        Filter the tf data by child frame id.
+        :param child_frame_id: the child frame id.
+        :return: the modified query.
+        """
+        return self.filter(entity_tf_view.child_frame_id == func.substring_index(child_frame_id, ':', -1))
 
     def filter_by_tasks(self, tasks: List[str], regexp: Optional[bool] = False) -> 'NeemQuery':
         """

@@ -157,9 +157,12 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(all(df[CL.task_type.value] == 'soma:Navigating'))
 
     def test_get_pre_task_state(self):
-        qr = self.pni.query_tasks_semantic_data(['pick']).get_result()
-        task = qr.get_tasks()[0]
-        sql_neem_id = qr.get_sql_neem_ids()[0]
+        qr = self.pni.query_tasks_semantic_data(['fetch']).get_result()
+        print(qr.get_tasks())
+        print(qr.get_sql_neem_ids())
+        task = "soma:Fetching_VLFMWSIR"
+        sql_neem_id = 9
+        self.pni.reset()
         state = self.pni.get_pre_task_state(task, sql_neem_id)
         self.assertIsInstance(state, pd.DataFrame)
         self.assertTrue(len(state) > 0)
@@ -181,4 +184,7 @@ class TestNeemPycramInterface(TestCase):
 
     def test_redo_pick_action_for_neem(self):
         self.pni.redo_pick_action()
+
+    def test_redo_grasping_action_for_neem(self):
+        self.pni.redo_grasping_action()
 

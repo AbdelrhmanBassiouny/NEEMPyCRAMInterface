@@ -56,7 +56,7 @@ def fetch_action(object_designator: ObjectDesignatorDescription.Object, arm: str
     :param arm: the arm to use to fetch the object.
     """
     robot_desig = BelieveObject(names=[robot_description.name])
-    ParkArmsAction.Action(Arms.BOTH).perform()
+    ParkArmsAction([Arms.BOTH]).resolve().perform()
     pickup_loc = CostmapLocation(target=object_designator, reachable_for=robot_desig.resolve(),
                                  reachable_arm=arm)
     # Tries to find a pick-up posotion for the robot that uses the given arm
@@ -70,16 +70,14 @@ def fetch_action(object_designator: ObjectDesignatorDescription.Object, arm: str
             f"Found no pose for the robot to grasp the object: {object_designator} with arm: {arm}")
 
     NavigateAction([pickup_pose.pose]).resolve().perform()
-    PickUpAction.Action(object_designator, arm, "front").perform()
-    ParkArmsAction.Action(Arms.BOTH).perform()
+    PickUpAction(object_designator, [arm], "front").resolve().perform()
+    ParkArmsAction([Arms.BOTH]).resolve().perform()
 
 
 class PyCRAMNEEMInterface(NeemInterface):
     """
     A class to interface with the NEEM database and PyCRAM.
     """
-    data_dir: Optional[str] = os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
-    World.add_resource_path(data_dir)
 
     action_designator_inspector = ModuleInspector(action_designator.__name__)
     pycram_actions = action_designator_inspector.get_all_classes_dict()
@@ -111,6 +109,9 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param db_url: the URL to the NEEM database.
         """
         super().__init__(db_url)
+        self.resources_dir: str = os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
+        World.add_resource_path(self.resources_dir)
+        self.all_data_dirs = World.data_directory
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
 
     @classmethod
@@ -178,6 +179,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.query_fetch_actions(sql_neem_id)
         task = self.get_result().get_tasks(unique=True)[0]
         qr = self.get_result().filter_by_task([task])
+        print(task)
+        print(qr.get_sql_neem_ids(unique=False))
         environment_desig, participant_desigs, performer_desigs = self.get_designators_for_neem_objects(qr)
         participant_desig = list(participant_desigs.values())[0]
         with simulated_robot():
@@ -191,12 +194,17 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return:
         """
         pni = PyCRAMNEEMInterface.from_pycram_neem_interface(self)
-        qr = (pni.query_neems_motion_replay_data(participant_necessary=False)
-              .filter_by_sql_neem_id([sql_neem_id])
-              .filter_by_tasks([task])
-              ).get_result()
+        q = (pni.query_neems_motion_replay_data(participant_necessary=False)
+             # .filter_by_sql_neem_id([sql_neem_id])
+             # .filter_by_tasks([task])
+             # .filter_tf_by_child_frame_id("SM_Bowl_2")
+             .select_task_type()
+             )
+        print(q.construct_query())
+        qr = q.get_result()
         print(qr.df)
         print(qr.get_sql_neem_ids(unique=True))
+        print(qr.get_task_types(unique=True))
         # print(df)
         # return df
 
@@ -615,7 +623,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param file_name: the file to find.
         :return: the path of the file in the data directories.
         """
-        for data_dir in self.data_dirs:
+        for data_dir in self.all_data_dirs:
             for file in os.listdir(data_dir):
                 for name in file_name:
                     if name in file:
@@ -714,7 +722,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: The download path of the mesh file.
         """
         file_name = mesh_link.split('/')[-1]
-        download_path = os.path.join(self.data_dir, file_name)
+        download_path = os.path.join(self.resources_dir, file_name)
         try:
             with request.urlopen(mesh_link, timeout=1) as response:
                 with open(download_path, 'wb') as file:
