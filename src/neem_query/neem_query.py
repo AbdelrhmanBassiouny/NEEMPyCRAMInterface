@@ -587,7 +587,7 @@ class NeemQuery:
                                    end_offset: Optional[float] = 0,
                                    base_link_is_outer: Optional[bool] = False) -> 'NeemQuery':
         """
-        Join all the participants' semantic data and the tf data.
+        Join all the participants' semantic data and the tf data, Assumes DulHasTimeInterval has been joined/selected.
         :param is_outer: whether to use outer join or not.
         :param begin_offset: the time offset from the beginning of the task.
         :param end_offset: the time offset from the end of the task.
@@ -1156,6 +1156,7 @@ class NeemQuery:
         :param join_table: First predicate table.
         :param join_on_table: Second predicate table.
         :param on: The condition to join on. If None, will join on the neem_id column only.
+        :param neem_id: The neem_id column to join on.
         :param is_outer: whether to use outer join or not.
         :return: The modified query.
         """

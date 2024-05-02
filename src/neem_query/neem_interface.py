@@ -195,21 +195,23 @@ class NeemInterface(NeemQuery):
             self.filter_by_tasks(tasks)
         return self
 
-    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = True) -> NeemQuery:
+    def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = True,
+                                       participant_base_link_necessary: Optional[bool] = False) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
+        :param participant_base_link_necessary: whether to only include tasks that have a participant base link or not.
         :return: the query.
         """
         self.reset()
-        (self.select_all_participants_semantic_data().select_tf_columns().select_tf_transform_columns().
-         select_neem_id().select_environment().select_sql_neem_id().
+        (self.select_all_participants_data().
+         select_neem_id().select_environment().select_sql_neem_id().select_task_type().
          select_from_tasks().
          join_task_types().
-         join_all_participants_semantic_data(is_outer=not participant_necessary, base_link_is_outer=True).
          join_task_time_interval().
-         join_tf_on_time_interval().
+         join_all_participants_data(is_outer=not participant_necessary,
+                                    base_link_is_outer=not participant_base_link_necessary).
          join_neems_metadata().join_neems_environment()
-         .order_by_tf_stamp()
+         .order_by_participant_tf_stamp()
          )
         return self
