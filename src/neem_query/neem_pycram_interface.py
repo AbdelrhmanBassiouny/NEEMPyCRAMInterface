@@ -229,36 +229,13 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         self.query_actions('grasping', sql_neem_id)
         task = self.get_result().get_tasks(unique=True)[0]
-        qr = self.get_result().filter_by_task([task])
-        environment_designators, participant_designators, performer_designators = (
-            self.spawn_neem_objects_and_get_designators(qr))
+
+        participant_designators, robot_designator = self.set_pre_task_state(task, sql_neem_id)
         participant_designator = list(participant_designators.values())[0]
-        participant = list(participant_designators.keys())[0]
-        self.reset()
-        self.query_neems_motion_replay_data(participant_necessary=True, participant_base_link_necessary=True)
-        self.filter_by_sql_neem_id([sql_neem_id])
-        participant_pose = self.get_latest_pose_of_participant(participant)
-        participant_object = participant_designator.resolve().world_object
-        participant_object.set_pose(participant_pose)
-        robot = None
-        if len(performer_designators) > 0:
-            performer_designator = list(performer_designators.values())[0]
-            performer_object = performer_designator.resolve().world_object
-            if performer_object.obj_type == ObjectType.ROBOT:
-                robot = performer_object
-            robot_pose = self.get_latest_pose_of_performer(list(performer_designators.keys())[0])
-            robot.set_pose(robot_pose)
-        if robot is None:
-            robot = self.spawn_pr2_and_get_object()
-        robot_designator = BelieveObject(names=[robot.name])
+
         with simulated_robot():
 
-            ParkArmsAction([Arms.BOTH]).resolve().perform()
-            MoveTorsoAction([0.25]).resolve().perform()
-            pick_up_location = CostmapLocation(target=participant_designator.resolve(),
-                                               reachable_for=robot_designator.resolve()).resolve()
-            NavigateAction([pick_up_location.pose]).resolve().perform()
-            LookAtAction([participant_pose]).resolve().perform()
+            self.pre_grasp_action(participant_designator, robot_designator)
 
             arms = [arm.name.lower() for arm in Arms]
             GraspingAction(arms, participant_designator).resolve().perform()
@@ -292,17 +269,6 @@ class PyCRAMNEEMInterface(NeemInterface):
             pose = participant_motion_data.get_latest_pose_of_entity_instance(participant)
         return pose
 
-    def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
-        """
-        Get the motion data of the participant.
-        :param query_result: the query result to get the motion data from.
-        :return: the motion data of the participant.
-        """
-        poses = self.get_participant_poses(query_result)
-        times = self.get_participant_stamp(query_result)
-        participant_instances = self.get_participants(query_result=query_result, unique=False)
-        return ReplayNEEMMotionData(poses, times, participant_instances)
-
     def get_latest_pose_of_performer(self, performer: str, query_result: Optional[QueryResult] = None,
                                      before_stamp: Optional[float] = None) -> Pose:
         """
@@ -319,6 +285,37 @@ class PyCRAMNEEMInterface(NeemInterface):
             pose = performer_motion_data.get_latest_pose_of_entity_instance(performer)
         return pose
 
+    def pre_grasp_action(self, participant_designator: ObjectDesignatorDescription,
+                         robot_designator: ObjectDesignatorDescription):
+        """
+        Perform the pre-grasp action.
+        """
+        self.get_ready_action()
+        pick_up_location = CostmapLocation(target=participant_designator.resolve(),
+                                           reachable_for=robot_designator.resolve()).resolve()
+        NavigateAction([pick_up_location.pose]).resolve().perform()
+        participant_pose = participant_designator.resolve().world_object.get_pose()
+        LookAtAction([participant_pose]).resolve().perform()
+
+    @staticmethod
+    def get_ready_action():
+        """
+        Get the ready action, which parks the arms and moves the torso.
+        """
+        ParkArmsAction([Arms.BOTH]).resolve().perform()
+        MoveTorsoAction([0.25]).resolve().perform()
+
+    def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
+        """
+        Get the motion data of the participant.
+        :param query_result: the query result to get the motion data from.
+        :return: the motion data of the participant.
+        """
+        poses = self.get_participant_poses(query_result)
+        times = self.get_participant_stamp(query_result)
+        participant_instances = self.get_participants(query_result=query_result, unique=False)
+        return ReplayNEEMMotionData(poses, times, participant_instances)
+
     def get_performer_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
         Get the motion data of the performer.
@@ -329,6 +326,49 @@ class PyCRAMNEEMInterface(NeemInterface):
         times = self.get_performer_stamp(query_result)
         performer_instances = self.get_performers(query_result=query_result, unique=False)
         return ReplayNEEMMotionData(poses, times, performer_instances)
+
+    def set_pre_task_state(self, task: str, sql_neem_id: int) -> Tuple[Dict[str, BelieveObject], BelieveObject]:
+        """
+        Set the state of the world before the task.
+        :param task: the task to set the state before.
+        :param sql_neem_id: the sql id of the NEEM.
+        :return: the designators for the participants and the robot.
+        """
+        qr = self.get_result().filter_by_task([task]).filter_by_sql_neem_id([sql_neem_id])
+        print(qr.df)
+        environment_designators, participant_designators, performer_designators = (
+            self.spawn_neem_objects_and_get_designators(qr))
+        task_start_time = qr.get_time_interval_begin()[0]
+        self.query_neems_motion_replay_data(participant_necessary=False, participant_base_link_necessary=False,
+                                            sql_neem_id=sql_neem_id)
+        self.set_pre_task_participants_state(participant_designators, task_start_time)
+        robot = None
+        if len(performer_designators) > 0:
+            performer_designator = list(performer_designators.values())[0]
+            performer_object = performer_designator.resolve().world_object
+            if performer_object.obj_type == ObjectType.ROBOT:
+                robot = performer_object
+                robot_pose = self.get_latest_pose_of_performer(list(performer_designators.keys())[0])
+                robot.set_pose(robot_pose)
+        if robot is None:
+            robot = self.spawn_pr2_and_get_object()
+        robot_designator = BelieveObject(names=[robot.name])
+        return participant_designators, robot_designator
+
+    def set_pre_task_participants_state(self, participant_designators: Dict[str, BelieveObject],
+                                        task_start_time: Optional[float] = None):
+        """
+        Set the state of the participants before the task.
+        :param participant_designators: the designators for the participants.
+        :param task_start_time: the time stamp to set the state before.
+        """
+        participant_designators = {name: designator for name, designator in participant_designators.items()
+                                   if 'hand' not in name.lower()}
+        for participant_designator in participant_designators.values():
+            participant = list(participant_designators.keys())[0]
+            participant_pose = self.get_latest_pose_of_participant(participant, before_stamp=task_start_time)
+            participant_object = participant_designator.resolve().world_object
+            participant_object.set_pose(participant_pose)
 
     def get_pre_task_state(self, task: str, sql_neem_id: int):
         """
@@ -369,8 +409,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param sql_neem_id: the sql id of the NEEM.
         """
         curr_task_start_time = self.get_result().get_task_start_time(curr_task, sql_neem_id)
-        pni = PyCRAMNEEMInterface.from_pycram_neem_interface(self)
-        return (pni.query_tasks_semantic_data(task_parameters_necessary=False)
+        ni = NeemInterface.from_neem_interface(self)
+        return (ni.query_tasks_semantic_data(task_parameters_necessary=False)
                 .filter_by_sql_neem_id([sql_neem_id]).filter(and_(SomaHasIntervalBegin.o < curr_task_start_time))
                 ).order_by(CL.time_interval_end.value)
 
@@ -641,13 +681,13 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         return self.get_and_spawn_entities(CL.participant.value,
                                            self.get_description_of_participant,
-                                           self.get_object_type,
+                                           lambda participant, _: self.get_object_type(participant),
                                            query_result)
 
     def get_and_spawn_entities(self,
                                entity_column_name: str,
                                description_getter: Callable[[str, QueryResult], str],
-                               object_type_getter: Callable[[str], ObjectType],
+                               object_type_getter: Callable[[str, QueryResult], ObjectType],
                                query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
@@ -672,7 +712,7 @@ class PyCRAMNEEMInterface(NeemInterface):
             object_names = [obj.name for obj in World.current_world.objects]
             if entity in object_names:
                 entity_name = f'{entity}_{object_names.count(entity)}'
-            entity_object = Object(entity_name, object_type_getter(entity), description)
+            entity_object = Object(entity_name, object_type_getter(entity, query_result), description)
             entity_objects[entity] = entity_object
         return entity_objects
 
