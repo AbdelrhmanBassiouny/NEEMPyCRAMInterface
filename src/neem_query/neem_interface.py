@@ -52,6 +52,14 @@ class NeemInterface(NeemQuery):
         """
         super().__init__(sql_url)
 
+    @classmethod
+    def from_neem_interface(cls, ni: 'NeemInterface') -> 'NeemInterface':
+        """
+        Create a new instance of the NeemInterface from an existing NeemQuery.
+        :param ni: the NeemInterface instance.
+        """
+        return cls(ni.engine.url.__str__().replace('***', 'password'))
+
     def query_plan_of_neem(self, neem_id: int) -> NeemQuery:
         """
         Get the complete cram plan of a neem given the neem ID.
@@ -196,11 +204,13 @@ class NeemInterface(NeemQuery):
         return self
 
     def query_neems_motion_replay_data(self, participant_necessary: Optional[bool] = True,
-                                       participant_base_link_necessary: Optional[bool] = False) -> NeemQuery:
+                                       participant_base_link_necessary: Optional[bool] = False,
+                                       sql_neem_id: Optional[int] = None) -> NeemQuery:
         """
         Get the data needed to replay the motions of the NEEMs.
         :param participant_necessary: whether to only include tasks that have a participant or not.
         :param participant_base_link_necessary: whether to only include tasks that have a participant base link or not.
+        :param sql_neem_id: the sql ID column of the Neems table.
         :return: the query.
         """
         self.reset()
@@ -214,4 +224,6 @@ class NeemInterface(NeemQuery):
          join_neems_metadata().join_neems_environment()
          .order_by_participant_tf_stamp()
          )
+        if sql_neem_id is not None:
+            self.filter_by_sql_neem_id([sql_neem_id])
         return self
