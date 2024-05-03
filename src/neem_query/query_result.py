@@ -53,6 +53,22 @@ class QueryResult:
         """
         return self.filter_dataframe({CL.participant.value: participants})
 
+    def filter_by_performer_type(self, performer_types: List[str]) -> 'QueryResult':
+        """
+        Get the data of a certain performer type from the query result DataFrame.
+        :param performer_types: the performer types.
+        :return: the data of the performer types.
+        """
+        return self.filter_dataframe({CL.is_performed_by_type.value: performer_types})
+
+    def filter_by_performer(self, performers: List[str]) -> 'QueryResult':
+        """
+        Get the data of a certain performer from the query result DataFrame.
+        :param performers: the performers.
+        :return: the data of the performers.
+        """
+        return self.filter_dataframe({CL.is_performed_by.value: performers})
+
     def filter_by_task(self, tasks: List[str]) -> 'QueryResult':
         """
         Get the data of a certain task from the query result DataFrame.
@@ -107,7 +123,7 @@ class QueryResult:
         :param task_parameter_types: the task parameter types.
         :return: the data of the task parameter types.
         """
-        return self.filter_dataframe({CL.task_parameter_type.value: task_parameter_types})
+        return self.filter_dataframe({CL.task_parameter_classification_type.value: task_parameter_types})
 
     def filter_by_agent(self, agents: List[str]) -> 'QueryResult':
         """
@@ -242,6 +258,24 @@ class QueryResult:
         """
         return self.get_column_values(CL.participant_type.value, unique=unique, drop_na=drop_na)
 
+    def get_performers(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
+        """
+        Get the performers in the query result DataFrame.
+        :param unique: whether to return unique performers or not.
+        :param drop_na: whether to drop None values or not.
+        :return: the performers in the NEEM.
+        """
+        return self.get_column_values(CL.is_performed_by.value, unique=unique, drop_na=drop_na)
+
+    def get_performer_types(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
+        """
+        Get the performer_types in the query result DataFrame.
+        :param unique: whether to return unique performer_types or not.
+        :param drop_na: whether to drop None values or not.
+        :return: the performer_types in the NEEM.
+        """
+        return self.get_column_values(CL.is_performed_by_type.value, unique=unique, drop_na=drop_na)
+
     def get_environments(self, unique: Optional[bool] = True, drop_na: Optional[bool] = False) -> List[str]:
         """
         Get the environments in the query result DataFrame.
@@ -288,6 +322,44 @@ class QueryResult:
         return (self.df[CL.participant_orientation_x.value].tolist(), self.df[CL.participant_orientation_y.value].tolist(),
                 self.df[CL.participant_orientation_z.value].tolist(),
                 self.df[CL.participant_orientation_w.value].tolist())
+
+    def get_performer_stamp(self) -> List[float]:
+        """
+        Get times from the query result DataFrame.
+        :return: the time stamps as a list.
+        """
+        return self.df[CL.performer_stamp.value].tolist()
+
+    def get_performer_child_frame_id(self) -> List[str]:
+        """
+        Get child_frame_id from the query result DataFrame.
+        :return: the child_frame_ids as a list.
+        """
+        return self.df[CL.performer_child_frame_id.value].tolist()
+
+    def get_performer_frame_id(self) -> List[str]:
+        """
+        Get frame_id from the query result DataFrame.
+        :return: the frame_ids as a list.
+        """
+        return self.df[CL.performer_frame_id.value].tolist()
+
+    def get_performer_positions(self) -> Tuple[List[float], List[float], List[float]]:
+        """
+        Get positions from the query result DataFrame.
+        :return: the positions as 3 lists for x, y, and z values.
+        """
+        return (self.df[CL.performer_translation_x.value].tolist(), self.df[CL.performer_translation_y.value].tolist(),
+                self.df[CL.performer_translation_z.value].tolist())
+
+    def get_performer_orientations(self) -> Tuple[List[float], List[float], List[float], List[float]]:
+        """
+        Get orientations from the query result DataFrame.
+        :return: the orientations.
+        """
+        return (self.df[CL.performer_orientation_x.value].tolist(), self.df[CL.performer_orientation_y.value].tolist(),
+                self.df[CL.performer_orientation_z.value].tolist(),
+                self.df[CL.performer_orientation_w.value].tolist())
 
     def get_all_subtask_types_of_task_type(self, task_type: str,
                                            unique: Optional[bool] = True,

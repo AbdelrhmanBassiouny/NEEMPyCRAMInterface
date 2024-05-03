@@ -12,10 +12,9 @@ from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designator import ObjectDesignatorDescription
-from pycram.designators import action_designator
 from pycram.designators.action_designator import PickUpAction, ParkArmsAction, NavigateAction, GraspingAction, \
     SetGripperAction, LookAtAction, ReleaseAction, PlaceAction, GripAction, CloseAction, OpenAction, TransportAction, \
-    DetectAction
+    DetectAction, MoveTorsoAction
 from pycram.designators.location_designator import CostmapLocation
 from pycram.designators.object_designator import BelieveObject
 from pycram.plan_failures import ObjectUnfetchable
@@ -38,7 +37,36 @@ class ReplayNEEMMotionData:
     """
     poses: List[Pose]
     times: List[float]
-    participant_instances: List[str]
+    entity_instances: List[str]
+
+    def get_latest_pose_before_time_stamp(self, entity_instance: str, stamp: float) -> Pose:
+        """
+        Get the latest pose of an entity instance before a given time stamp.
+        :param entity_instance: the entity instance to get the latest pose of.
+        :param stamp: the time stamp to get the latest pose before.
+        :return: the latest pose of the entity instance before the given time stamp.
+        """
+        poses = [pose for pose, time_, instance in zip(self.poses, self.times, self.entity_instances)
+                 if time_ <= stamp and instance == entity_instance]
+        return poses[-1]
+
+    def get_latest_pose_of_entity_instance(self, entity_instance: str) -> Pose:
+        """
+        Get the latest pose of an entity instance.
+        :param entity_instance: the entity instance to get the latest pose of.
+        :return: the latest pose of the entity instance.
+        """
+        return self.filter_by_entity_instance(entity_instance).poses[-1]
+
+    def filter_by_entity_instance(self, entity_instance: str) -> 'ReplayNEEMMotionData':
+        """
+        Filter the data by the entity instance.
+        :param entity_instance: the entity instance to filter by.
+        :return: the filtered data.
+        """
+        poses = [pose for pose, instance in zip(self.poses, self.entity_instances) if instance == entity_instance]
+        times = [time_ for time_, instance in zip(self.times, self.entity_instances) if instance == entity_instance]
+        return ReplayNEEMMotionData(poses, times, [entity_instance] * len(poses))
 
 
 @dataclass
@@ -72,7 +100,7 @@ def fetch_action(object_designator: ObjectDesignatorDescription.Object, arm: str
             f"Found no pose for the robot to grasp the object: {object_designator} with arm: {arm}")
 
     NavigateAction([pickup_pose.pose]).resolve().perform()
-    PickUpAction(object_designator, [arm], "front").resolve().perform()
+    PickUpAction(object_designator, [arm], ["front"]).resolve().perform()
     ParkArmsAction([Arms.BOTH]).resolve().perform()
 
 
@@ -97,11 +125,22 @@ class PyCRAMNEEMInterface(NeemInterface):
                               'soma:Detecting': DetectAction,
                               'soma:AssumingArmPose:': ParkArmsAction,
                               }
+    """
+    A dictionary to map soma actions to PyCRAM actions.
+    """
 
     soma_to_pycram_grasps = {'soma:FrontGrasp': Grasp.FRONT,
                              'soma:TopGrasp': Grasp.TOP,
                              'soma:LeftGrasp': Grasp.LEFT,
                              'soma:RightGrasp': Grasp.RIGHT}
+    """
+    A dictionary to map soma grasps to PyCRAM grasps.
+    """
+
+    known_robots = ['pr2', 'boxy', 'hsrb', 'donbot', 'tiago', 'ur5e', 'ur5']
+    """
+    A list of known robots that can be spawned and used in pycram.
+    """
 
     def __init__(self, db_url: str):
         """
@@ -191,10 +230,105 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.query_actions('grasping', sql_neem_id)
         task = self.get_result().get_tasks(unique=True)[0]
         qr = self.get_result().filter_by_task([task])
-        environment_desig, participant_desigs, performer_desigs = self.spawn_neem_objects_and_get_designators(qr)
-        participant_desig = list(participant_desigs.values())[0]
-        arms = [arm.name.lower() for arm in Arms]
-        GraspingAction(arms, participant_desig).resolve().perform()
+        environment_designators, participant_designators, performer_designators = (
+            self.spawn_neem_objects_and_get_designators(qr))
+        participant_designator = list(participant_designators.values())[0]
+        participant = list(participant_designators.keys())[0]
+        self.reset()
+        self.query_neems_motion_replay_data(participant_necessary=True, participant_base_link_necessary=True)
+        self.filter_by_sql_neem_id([sql_neem_id])
+        participant_pose = self.get_latest_pose_of_participant(participant)
+        participant_object = participant_designator.resolve().world_object
+        participant_object.set_pose(participant_pose)
+        robot = None
+        if len(performer_designators) > 0:
+            performer_designator = list(performer_designators.values())[0]
+            performer_object = performer_designator.resolve().world_object
+            if performer_object.obj_type == ObjectType.ROBOT:
+                robot = performer_object
+            robot_pose = self.get_latest_pose_of_performer(list(performer_designators.keys())[0])
+            robot.set_pose(robot_pose)
+        if robot is None:
+            robot = self.spawn_pr2_and_get_object()
+        robot_designator = BelieveObject(names=[robot.name])
+        with simulated_robot():
+
+            ParkArmsAction([Arms.BOTH]).resolve().perform()
+            MoveTorsoAction([0.25]).resolve().perform()
+            pick_up_location = CostmapLocation(target=participant_designator.resolve(),
+                                               reachable_for=robot_designator.resolve()).resolve()
+            NavigateAction([pick_up_location.pose]).resolve().perform()
+            LookAtAction([participant_pose]).resolve().perform()
+
+            arms = [arm.name.lower() for arm in Arms]
+            GraspingAction(arms, participant_designator).resolve().perform()
+
+    @staticmethod
+    def spawn_pr2_and_get_object(pose: Optional[Pose] = None) -> Object:
+        """
+        Spawn the PR2 robot and get the pycram object for it.
+        :param pose: the pose of the PR2 robot.
+        :return: the pycram object for the PR2 robot.
+        """
+        if pose is None:
+            pose = Pose([1.5, 2.5, 0])
+        return Object('pr2', ObjectType.ROBOT, robot_description.name + '.urdf', pose=pose)
+
+    def get_latest_pose_of_participant(self,
+                                       participant: str,
+                                       query_result: Optional[QueryResult] = None,
+                                       before_stamp: Optional[float] = None) -> Pose:
+        """
+        Get the latest pose of a participant.
+        :param participant: the participant to get the latest pose of.
+        :param query_result: the query result to get the latest pose from.
+        :param before_stamp: the time stamp to get the latest pose before.
+        :return: the latest pose of the participant.
+        """
+        participant_motion_data = self.get_participant_motion_data(query_result)
+        if before_stamp is not None:
+            pose = participant_motion_data.get_latest_pose_before_time_stamp(participant, before_stamp)
+        else:
+            pose = participant_motion_data.get_latest_pose_of_entity_instance(participant)
+        return pose
+
+    def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
+        """
+        Get the motion data of the participant.
+        :param query_result: the query result to get the motion data from.
+        :return: the motion data of the participant.
+        """
+        poses = self.get_participant_poses(query_result)
+        times = self.get_participant_stamp(query_result)
+        participant_instances = self.get_participants(query_result=query_result, unique=False)
+        return ReplayNEEMMotionData(poses, times, participant_instances)
+
+    def get_latest_pose_of_performer(self, performer: str, query_result: Optional[QueryResult] = None,
+                                     before_stamp: Optional[float] = None) -> Pose:
+        """
+        Get the latest pose of a performer.
+        :param performer: the performer to get the latest pose of.
+        :param query_result: the query result to get the latest pose from.
+        :param before_stamp: the time stamp to get the latest pose before.
+        :return: the latest pose of the performer.
+        """
+        performer_motion_data = self.get_performer_motion_data(query_result)
+        if before_stamp is not None:
+            pose = performer_motion_data.get_latest_pose_before_time_stamp(performer, before_stamp)
+        else:
+            pose = performer_motion_data.get_latest_pose_of_entity_instance(performer)
+        return pose
+
+    def get_performer_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
+        """
+        Get the motion data of the performer.
+        :param query_result: the query result to get the motion data from.
+        :return: the motion data of the performer.
+        """
+        poses = self.get_performer_poses(query_result)
+        times = self.get_performer_stamp(query_result)
+        performer_instances = self.get_performers(query_result=query_result, unique=False)
+        return ReplayNEEMMotionData(poses, times, performer_instances)
 
     def get_pre_task_state(self, task: str, sql_neem_id: int):
         """
@@ -273,7 +407,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         environment_desig = BelieveObject(names=[neem_objects.environment.name])
         participant_desigs = {name: BelieveObject(names=[object_.name])
                               for name, object_ in neem_objects.participants.items()}
-        performer_desigs = {name: BelieveObject(names=[object_.name])
+        performer_desigs = {name: BelieveObject(names=[object_.name], types=[object_.obj_type])
                             for name, object_ in neem_objects.performers.items()}
         return environment_desig, participant_desigs, performer_desigs
 
@@ -443,7 +577,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         motion_data = self.get_participant_motion_data(query_result)
         poses = motion_data.poses
         times = motion_data.times
-        participant_instances = motion_data.participant_instances
+        participant_instances = motion_data.entity_instances
 
         prev_time = 0
         for participant, pose, current_time in zip(participant_instances, poses, times):
@@ -496,7 +630,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         return self.get_and_spawn_entities(CL.is_performed_by.value,
                                            lambda agent, _: self.get_description_of_performer(agent),
-                                           lambda _: ObjectType.ROBOT,
+                                           self.get_performer_object_type,
                                            query_result)
 
     def get_and_spawn_participants(self, query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
@@ -687,7 +821,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get all the files in the data directories.
         """
         files = []
-        for data_dir in self.data_dirs:
+        for data_dir in self.all_data_dirs:
             files.extend(os.listdir(data_dir))
         return files
 
@@ -773,6 +907,48 @@ class PyCRAMNEEMInterface(NeemInterface):
         else:
             return ObjectType.GENERIC_OBJECT
 
+    def get_performer_object_type(self, performer: str, query_result: Optional[QueryResult] = None)\
+            -> Optional[ObjectType]:
+        """
+        Get the type of pycram object that is a performer in the neem task.
+        :param performer: the neem task performer to get the type of.
+        :param query_result: the query result to get the type from.
+        :return: the type of the performer/object.
+        """
+
+        if self.is_a_known_robot(performer):
+            return ObjectType.ROBOT
+
+        query_result = query_result if query_result is not None else self.get_result()
+        performer_type = query_result.filter_by_performer([performer]).get_performer_types()[0]
+        if performer_type is not None:
+            if self.is_a_human(performer_type):
+                return ObjectType.HUMAN
+
+        return None
+
+    def is_a_known_robot(self, performer: str) -> bool:
+        """
+        Check if the performer is a known robot.
+        :param performer: the performer to check.
+        :return: whether the performer is a known robot or not.
+        """
+        for robot in self.known_robots:
+            if robot in performer.lower():
+                return True
+        return False
+
+    @staticmethod
+    def is_a_human(performer_type: str) -> bool:
+        """
+        Check if the performer is a human.
+        :param performer_type: the performer type to check.
+        :return: whether the performer is a human or not.
+        """
+        if any([v in performer_type.lower() for v in ['natural', 'human', 'person', 'hand']]):
+            return True
+        return False
+
     def get_participant_transforms(self, query_result: Optional[QueryResult] = None) -> List[Transform]:
         """
         Get transforms from the query result.
@@ -831,6 +1007,65 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         query_result = query_result if query_result is not None else self.get_result()
         return query_result.get_participant_types(unique)
+
+    def get_performer_transforms(self, query_result: Optional[QueryResult] = None) -> List[Transform]:
+        """
+        Get transforms from the query result.
+        :return: the transforms as a list.
+        """
+        query_result = query_result if query_result is not None else self.get_result()
+        position = query_result.get_performer_positions()
+        orientation = query_result.get_performer_orientations()
+        frame_id = query_result.get_performer_frame_id()
+        child_frame_id = query_result.get_performer_child_frame_id()
+        transforms = [Transform([x, y, z], [rx, ry, rz, rw], frame_id, child_frame_id, time=rospy.Time())
+                      for x, y, z, rx, ry, rz, rw, frame_id, child_frame_id in
+                      zip(*position, *orientation, frame_id, child_frame_id)]
+        return transforms
+
+    def get_performer_poses(self, query_result: Optional[QueryResult] = None) -> List[Pose]:
+        """
+        Get poses from the query result.
+        :param query_result: the query result to get the poses from.
+        :return: the poses as a list.
+        """
+        query_result = query_result if query_result is not None else self.get_result()
+        positions = query_result.get_performer_positions()
+        orientations = query_result.get_performer_orientations()
+        poses = [Pose([x, y, z], [rx, ry, rz, rw])
+                 for x, y, z, rx, ry, rz, rw in zip(*positions, *orientations)]
+        return poses
+
+    def get_performer_stamp(self, query_result: Optional[QueryResult] = None) -> List[float]:
+        """
+        Get times from the query result DataFrame.
+        :param query_result: the query result to get the times from.
+        :return: the time stamps as a list.
+        """
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_performer_stamp()
+
+    def get_performers(self, unique: Optional[bool] = True,
+                       query_result: Optional[QueryResult] = None) -> List[str]:
+        """
+        Get the performers in the query result DataFrame.
+        :param unique: whether to return unique performers or not.
+        :param query_result: the query result to get the performers from.
+        :return: the performers in the NEEM.
+        """
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_performers(unique)
+
+    def get_performer_types(self, unique: Optional[bool] = True,
+                            query_result: Optional[QueryResult] = None) -> List[str]:
+        """
+        Get the performer_types in the query result DataFrame.
+        :param unique: whether to return unique performer_types or not.
+        :param query_result: the query result to get the performer_types from.
+        :return: the performer_types in the NEEM.
+        """
+        query_result = query_result if query_result is not None else self.get_result()
+        return query_result.get_performer_types(unique)
 
     def get_neem_ids(self, unique: Optional[bool] = True, query_result: Optional[QueryResult] = None) -> List[str]:
         """
