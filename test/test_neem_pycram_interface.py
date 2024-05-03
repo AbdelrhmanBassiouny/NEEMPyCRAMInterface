@@ -94,7 +94,7 @@ class TestNeemPycramInterface(TestCase):
          .filter_by_participant_type(['soma:DesignedContainer']))
         motion_data: ReplayNEEMMotionData = self.pni.get_participant_motion_data()
         self.assertEqual(len(motion_data.poses), len(motion_data.times))
-        self.assertEqual(len(motion_data.times), len(motion_data.participant_instances))
+        self.assertEqual(len(motion_data.times), len(motion_data.entity_instances))
         self.assertTrue(len(motion_data.poses) > 0)
 
     def test_make_camel_case(self):
@@ -188,5 +188,5 @@ class TestNeemPycramInterface(TestCase):
         self.pni.redo_pick_action()
 
     def test_redo_grasping_action_for_neem(self):
-        self.pni.redo_grasping_action()
+        self.pni.redo_grasping_action(14)
 
