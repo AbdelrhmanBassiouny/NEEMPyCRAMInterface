@@ -583,20 +583,20 @@ class NeemQuery:
         return self
 
     def join_all_participants_data(self, is_outer: Optional[bool] = False,
-                                   begin_offset: Optional[float] = 0,
-                                   end_offset: Optional[float] = 0,
-                                   base_link_is_outer: Optional[bool] = False) -> 'NeemQuery':
+                                   base_link_is_outer: Optional[bool] = False,
+                                   filter_tf_by_time_interval: Optional[bool] = False) -> 'NeemQuery':
         """
         Join all the participants' semantic data and the tf data, Assumes DulHasTimeInterval has been joined/selected.
         :param is_outer: whether to use outer join or not.
-        :param begin_offset: the time offset from the beginning of the task.
-        :param end_offset: the time offset from the end of the task.
         :param base_link_is_outer: whether to use outer join for the base link or not.
+        :param filter_tf_by_time_interval: whether to filter tf data by time interval or not.
         :return: the modified query.
         """
         (self.join_all_participants_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_is_outer)
-         .join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
-                                               is_outer=is_outer)
+         # .join_participant_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
+         #                                       is_outer=is_outer)
+         .join_participant_tf(is_outer=is_outer)
+         # .filter_tf_by_participant_base_link()
          )
         return self
 
@@ -678,6 +678,17 @@ class NeemQuery:
         self.join_neem_id_tables(SomaHasShape, DulHasParticipant,
                                  on=SomaHasShape.dul_PhysicalObject_s == DulHasParticipant.dul_Object_o,
                                  is_outer=is_outer)
+        return self
+
+    def join_participant_tf(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the participant tf table. Assumes ParticipantBaseLink has been joined/selected already.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        self._join_entity_tf_using_child_frame_id(self.participant_tf_view,
+                                                  func.substring_index(ParticipantBaseLink.urdf_Link_o, ':', -1),
+                                                  ParticipantBaseLink, is_outer=is_outer)
         return self
 
     def join_participant_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
@@ -1045,7 +1056,7 @@ class NeemQuery:
         self.join_neem_id_tables(entity_tf_view, SomaHasIntervalBegin, on=cond, is_outer=is_outer)
         return self
 
-    def _join_entity_tf_using_child_frame_id(self, entity_tf: Type[Tf],
+    def _join_entity_tf_using_child_frame_id(self, entity_tf: Union[Type[Tf], NamedFromClause],
                                              child_frame_id: str,
                                              neem_id_table: Type[Base],
                                              is_outer: Optional[bool] = False) -> 'NeemQuery':
@@ -1324,6 +1335,49 @@ class NeemQuery:
         :return: the modified query.
         """
         return self.filter_string_column(type_table.o, types, regexp=regexp, negate=negate)
+
+    def filter_tf_by_time_interval(self, begin_offset: Optional[float] = 0,
+                                   end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Filter the tf data by time interval.
+        For arguments documentation look at :py:meth:`NEEMQuery._filter_entity_tf_by_time_interval`.
+        :return: the modified query.
+        """
+        return self._filter_entity_tf_by_time_interval(self.tf_view, begin_offset, end_offset)
+
+    def filter_participant_tf_by_time_interval(self, begin_offset: Optional[float] = 0,
+                                               end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Filter the tf data by time interval.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self._filter_entity_tf_by_time_interval(self.participant_tf_view, begin_offset, end_offset)
+
+    def filter_performer_tf_by_time_interval(self, begin_offset: Optional[float] = 0,
+                                             end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Filter the tf data by time interval.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self._filter_entity_tf_by_time_interval(self.performer_tf_view, begin_offset, end_offset)
+
+    def _filter_entity_tf_by_time_interval(self, entity_tf_view: NamedFromClause,
+                                           begin_offset: Optional[float] = 0,
+                                           end_offset: Optional[float] = 0) -> 'NeemQuery':
+        """
+        Filter the tf data by time interval.
+        :param entity_tf_view: the view of the entity tf data.
+        :param begin_offset: the time offset from the beginning of the task.
+        :param end_offset: the time offset from the end of the task.
+        :return: the modified query.
+        """
+        return self.filter(between(entity_tf_view.stamp,
+                                   SomaHasIntervalBegin.o + begin_offset,
+                                   SomaHasIntervalEnd.o + end_offset))
 
     def filter_string_column(self, filter_col: Union[Column, str], values: List[str], regexp: Optional[bool] = False,
                              negate: Optional[bool] = False) -> 'NeemQuery':

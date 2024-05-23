@@ -2,9 +2,9 @@ from unittest import TestCase, skipIf
 
 import pandas as pd
 
+from neem_query.enums import ColumnLabel as CL
 from neem_query.neem_pycram_interface import PyCRAMNEEMInterface, ReplayNEEMMotionData
 from neem_query.query_result import QueryResult
-from neem_query.enums import ColumnLabel as CL
 
 pycram_not_found = False
 try:
@@ -39,9 +39,11 @@ class TestNeemPycramInterface(TestCase):
         self.pni.reset()
 
     def get_pouring_action_data(self):
-        self.neem_qr = (self.pni.query_task_motion_data(['Pour'], regexp=True).
-                        filter_by_participant_type(['soma:DesignedContainer']).
-                        limit(100).get_result())
+        query = (self.pni.query_task_motion_data(['Pour'], regexp=True).
+                 filter_by_participant_type(['soma:DesignedContainer']).
+                 limit(100))
+        # print(query.construct_query())
+        query.get_result()
 
     def test_get_and_spawn_environment(self):
         self.get_pouring_action_data()
@@ -189,4 +191,3 @@ class TestNeemPycramInterface(TestCase):
 
     def test_redo_grasping_action_for_neem(self):
         self.pni.redo_grasping_action(14)
-

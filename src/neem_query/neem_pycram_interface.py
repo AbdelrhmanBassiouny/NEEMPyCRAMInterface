@@ -305,17 +305,6 @@ class PyCRAMNEEMInterface(NeemInterface):
         ParkArmsAction([Arms.BOTH]).resolve().perform()
         MoveTorsoAction([0.25]).resolve().perform()
 
-    def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
-        """
-        Get the motion data of the participant.
-        :param query_result: the query result to get the motion data from.
-        :return: the motion data of the participant.
-        """
-        poses = self.get_participant_poses(query_result)
-        times = self.get_participant_stamp(query_result)
-        participant_instances = self.get_participants(query_result=query_result, unique=False)
-        return ReplayNEEMMotionData(poses, times, participant_instances)
-
     def get_performer_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
         Get the motion data of the performer.
