@@ -755,8 +755,9 @@ class NeemQuery:
         :return: the NEEMs as a pandas dataframe.
         """
         (self.join_all_performers_semantic_data(is_outer=is_outer, base_link_is_outer=base_link_outer)
-         .join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
-                                             is_outer=is_outer)
+         # .join_performer_tf_on_time_interval(begin_offset=begin_offset, end_offset=end_offset,
+         #                                     is_outer=is_outer)
+            .join_performer_tf(is_outer=is_outer)
          )
         return self
 
@@ -814,6 +815,15 @@ class NeemQuery:
                                  on=PerformerBaseLinkName.dul_PhysicalObject_s == SomaIsPerformedBy.dul_Agent_o,
                                  is_outer=is_outer)
         return self
+
+    def join_performer_tf(self, is_outer: Optional[bool] = False) -> 'NeemQuery':
+        """
+        Join the performer tf data to the query.
+        :param is_outer: whether to use outer join or not.
+        :return: the modified query.
+        """
+        return self._join_entity_tf_using_child_frame_id(self.performer_tf_view, PerformerBaseLinkName.o,
+                                                         PerformerBaseLinkName, is_outer=is_outer)
 
     def join_performer_tf_on_time_interval(self, begin_offset: Optional[float] = 0,
                                            end_offset: Optional[float] = 0,

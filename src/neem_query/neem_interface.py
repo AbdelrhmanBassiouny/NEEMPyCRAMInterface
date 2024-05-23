@@ -137,13 +137,17 @@ class NeemInterface(NeemQuery):
         self._query_tasks_data(task_types=task_types, task_parameters_necessary=task_parameters_necessary,
                                tasks=tasks, regexp=regexp, select_columns=select_columns)
         if select_columns:
-            self.select_all_participants_data().select_all_performers_data()
-        (self.
-         join_all_participants_data(is_outer=not participant_necessary,
-                                    base_link_is_outer=not participant_base_link_necessary).
-         join_all_performers_data(is_outer=not performer_necessary,
-                                  base_link_outer=not performer_base_link_necessary)
-         )
+            (
+                self.select_all_participants_data()
+                # .select_all_performers_data()
+            )
+        (
+            self.
+            join_all_participants_data(is_outer=not participant_necessary,
+                                       base_link_is_outer=not participant_base_link_necessary)
+            # .join_all_performers_data(is_outer=not performer_necessary,
+            #                          base_link_outer=not performer_base_link_necessary)
+        )
         return self
 
     def query_tasks_semantic_data(self, task_types: Optional[List[str]] = None,
