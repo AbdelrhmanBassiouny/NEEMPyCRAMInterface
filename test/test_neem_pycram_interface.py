@@ -1,4 +1,4 @@
-from unittest import TestCase, skipIf
+from unittest import TestCase, skipIf, skip
 
 import pandas as pd
 
@@ -135,7 +135,6 @@ class TestNeemPycramInterface(TestCase):
 
     def test_query_actions(self):
         df = self.pni.query_actions(participant_necessary=True).get_result().get_task_types(unique=True)
-        print(df)
         self.assertTrue(len(df) > 0)
 
     def test_query_vr_actions(self):
@@ -153,6 +152,7 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(len(df) > 0)
         self.assertTrue(all(df[CL.is_performed_by_type.value] == 'dul:NaturalPerson'))
 
+    # @skip("No complete navigate data available in the NEEM database")
     def test_query_navigate_actions(self):
         df = self.pni.query_navigate_actions().get_result().df
         self.assertTrue(len(df) > 0)
@@ -163,8 +163,6 @@ class TestNeemPycramInterface(TestCase):
                                                 participant_base_link_necessary=True).get_result()
         tasks = qr.get_tasks()
         sql_neem_ids = qr.get_sql_neem_ids()
-        print(tasks)
-        print(sql_neem_ids)
         task = tasks[1]  # 'soma:Grasping_HXUPQLZY'
         sql_neem_id = sql_neem_ids[1]  # 14
         state = self.pni.get_pre_task_state(task, sql_neem_id)
@@ -173,7 +171,6 @@ class TestNeemPycramInterface(TestCase):
 
     def test_query_all_task_data(self):
         q = self.pni.query_all_task_data(['pour'])
-        print(q.construct_query())
         df = q.get_result().df
         self.assertTrue(len(df) > 0)
 
@@ -183,11 +180,14 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(len(df) > 0)
         self.assertTrue(all(df[CL.task_type.value] == 'soma:Transporting'))
 
+    @skip("No complete fetch data available in the NEEM database")
     def test_redo_fetch_action_for_neem(self):
         self.pni.redo_fetch_action()
 
+    @skip("No complete pick data available in the NEEM database")
     def test_redo_pick_action_for_neem(self):
         self.pni.redo_pick_action()
 
+    @skip("Working but it is slow")
     def test_redo_grasping_action_for_neem(self):
         self.pni.redo_grasping_action(14)

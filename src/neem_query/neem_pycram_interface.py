@@ -227,7 +227,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         Redo grasping actions from neem(s) using PyCRAM.
         """
-        self.query_actions('grasping', sql_neem_id)
+        self.query_actions(['grasping'], sql_neem_id)
         task = self.get_result().get_tasks(unique=True)[0]
 
         participant_designators, robot_designator = self.set_pre_task_state(task, sql_neem_id)
@@ -452,7 +452,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get the query to redo transport actions from neem(s) using PyCRAM.
         For arguments documentation look at :py:meth:`PyCRAMNEEMInterface.query_actions`.
         """
-        return self.query_actions('transport',
+        return self.query_actions(['transport'],
                                   sql_neem_id=sql_neem_id,
                                   task_parameters_necessary=task_parameters_necessary,
                                   participant_necessary=participant_necessary,
@@ -472,7 +472,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get the query to redo pick actions from neem(s) using PyCRAM.
         For arguments documentation look at :py:meth:`PyCRAMNEEMInterface.query_actions`.
         """
-        self.query_actions('pick', sql_neem_id=sql_neem_id, task_parameters_necessary=task_parameters_necessary,
+        self.query_actions(['pick'], sql_neem_id=sql_neem_id, task_parameters_necessary=task_parameters_necessary,
                            participant_necessary=participant_necessary, performer_necessary=performer_necessary,
                            participant_base_link_necessary=participant_base_link_necessary,
                            performer_base_link_necessary=performer_base_link_necessary, select_columns=select_columns)
@@ -546,7 +546,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get the query to redo fetch actions from neem(s) using PyCRAM.
         For arguments documentation look at :py:meth:`PyCRAMNEEMInterface.query_actions`.
         """
-        return self.query_actions('fetch', sql_neem_id=sql_neem_id,
+        return self.query_actions(['fetch'], sql_neem_id=sql_neem_id,
                                   task_parameters_necessary=task_parameters_necessary,
                                   participant_necessary=participant_necessary,
                                   performer_necessary=performer_necessary,
@@ -559,9 +559,10 @@ class PyCRAMNEEMInterface(NeemInterface):
         Get the query to redo navigate actions from neem(s) using PyCRAM.
         For arguments documentation look at :py:meth:`PyCRAMNEEMInterface.query_actions`.
         """
-        return self.query_actions('navigate', sql_neem_id=sql_neem_id)
 
-    def query_actions(self, action_name: Optional[str] = None,
+        return self.query_actions(['navigating', 'navigation'], sql_neem_id=sql_neem_id)
+
+    def query_actions(self, action_name: Optional[List[str]] = None,
                       sql_neem_id: Optional[int] = None,
                       task_parameters_necessary: Optional[bool] = False,
                       participant_necessary: Optional[bool] = False,
@@ -583,7 +584,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param select_columns: whether to select the columns or not.
         :return: the modified query.
         """
-        self.query_tasks_semantic_data([action_name] if action_name is not None else None,
+        self.query_tasks_semantic_data(action_name if action_name is not None else None,
                                        task_parameters_necessary=task_parameters_necessary,
                                        participant_base_link_necessary=participant_base_link_necessary,
                                        performer_base_link_necessary=performer_base_link_necessary,
