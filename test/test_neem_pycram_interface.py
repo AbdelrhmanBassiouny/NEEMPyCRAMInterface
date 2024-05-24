@@ -192,7 +192,6 @@ class TestNeemPycramInterface(TestCase):
     def test_redo_grasping_action_for_neem(self):
         self.pni.redo_grasping_action(14)
 
-    @skip("Working but it is slow")
+    # @skip("Working but it is slow")
     def test_motion_replay(self):
-        self.pni.query_neems_motion_replay_data().filter_by_task_types(['Pour'], regexp=True)
-        self.pni.replay_neem_motions()
+        self.pni.replay_motion_of_neem(14)

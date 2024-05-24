@@ -7,7 +7,7 @@ from urllib import request
 
 import rospy
 from sqlalchemy import and_
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Generator
 
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
@@ -596,11 +596,32 @@ class PyCRAMNEEMInterface(NeemInterface):
             self.filter_by_sql_neem_id([sql_neem_id])
         return self
 
-    def replay_neem_motions(self, query_result: Optional[QueryResult] = None):
+    def replay_motion_of_neem(self, sql_neem_id: Optional[int] = None):
+        """
+        Replay the motions of a NEEM using PyCRAM.
+        The query should contain:
+         neem_id, participant, translation, orientation, stamp.
+        """
+        self.query_neems_motion_replay_data(sql_neem_id=sql_neem_id)
+        self.replay_motions_in_query()
+
+    def replay_motion_of_task_type(self, task: str, sql_neem_id: Optional[int] = None):
+        """
+        Replay the motions of a task type using PyCRAM.
+        The query should contain:
+         neem_id, participant, translation, orientation, stamp.
+        """
+        self.query_neems_motion_replay_data(sql_neem_id=sql_neem_id).filter_by_task_types([task], regexp=True)
+        self.replay_motions_in_query()
+
+    def replay_motions_in_query(self, query_result: Optional[QueryResult] = None,
+                                yield_objects: Optional[bool] = False) -> Union[Generator[Object, None, None], None]:
         """
         Replay NEEMs using PyCRAM. The query should contain:
          environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
+        :param query_result: the query result to replay the motions from.
+        :param yield_objects: whether to yield the objects or not.
         """
 
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
@@ -609,7 +630,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         poses = motion_data.poses
         times = motion_data.times
         participant_instances = motion_data.entity_instances
-
+        unique_participants = list(set(participant_instances))
+        moved_participants = []
         prev_time = 0
         for participant, pose, current_time in zip(participant_instances, poses, times):
             if prev_time > 0:
@@ -619,6 +641,12 @@ class PyCRAMNEEMInterface(NeemInterface):
                 time.sleep(wait_time)
             prev_time = current_time
             participant_objects[participant].set_pose(pose)
+            if participant not in moved_participants and pose != Pose():
+                moved_participants.append(participant)
+            if not all([p in moved_participants for p in unique_participants]):
+                continue
+            if yield_objects:
+                yield participant_objects[participant]
 
     def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
