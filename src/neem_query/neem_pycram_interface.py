@@ -152,6 +152,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         World.add_resource_path(self.resources_dir)
         self.all_data_dirs = World.data_directory
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
+        self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
 
     @classmethod
     def from_pycram_neem_interface(cls, pycram_neem_interface: 'PyCRAMNEEMInterface'):
@@ -741,7 +742,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         mesh_link = self.get_mesh_link_of_object_in_neem(participant, query_result)
         if mesh_link is not None:
-            download_path = self.download_mesh_file(mesh_link)
+            download_path = self.download_file(mesh_link)
             if download_path is not None:
                 return download_path
 
@@ -861,9 +862,27 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param participant_names: the participants to search for.
         :return: the download path of the participant mesh file.
         """
-        file_names = self.mesh_repo_search.search_similar_file_names(participant_names, find_all=False)
+        return self._search_for_file_in_online_repository(self.mesh_repo_search, participant_names)
+
+    def _search_for_urdf_in_online_repository(self, urdf_name: str) -> Union[str, None]:
+        """
+        Search for a URDF in the online repository.
+        :param urdf_name: the URDF to search for.
+        :return: the download path of the URDF file.
+        """
+        return self._search_for_file_in_online_repository(self.urdf_repo_search, [urdf_name])
+
+    def _search_for_file_in_online_repository(self, repo_search_obj: RepositorySearch,
+                                              file_names: List[str]) -> Union[str, None]:
+        """
+        Search for a file in the online repository.
+        :param repo_search_obj: the repository search object to use.
+        :param file_names: the files to search for.
+        :return: the download path of the file.
+        """
+        file_names = repo_search_obj.search_similar_file_names(file_names, find_all=False)
         if len(file_names) > 0:
-            download_path = self.download_mesh_file(file_names[0])
+            download_path = self.download_file(file_names[0])
             return download_path
 
     def get_mesh_link_of_object_in_neem(self, object_name: str,
@@ -888,23 +907,23 @@ class PyCRAMNEEMInterface(NeemInterface):
             mesh_link = mesh_path
         return mesh_link
 
-    def download_mesh_file(self, mesh_link: str) -> Union[str, None]:
+    def download_file(self, file_link: str) -> Union[str, None]:
         """
-        Download the mesh file.
-        :param mesh_link: The link of the mesh file.
-        :return: The download path of the mesh file.
+        Download a file.
+        :param file_link: The link of the file.
+        :return: The download path of the file.
         """
-        file_name = mesh_link.split('/')[-1]
+        file_name = file_link.split('/')[-1]
         download_path = os.path.join(self.resources_dir, file_name)
         try:
-            with request.urlopen(mesh_link, timeout=1) as response:
+            with request.urlopen(file_link, timeout=1) as response:
                 with open(download_path, 'wb') as file:
                     shutil.copyfileobj(response, file)
             while not os.path.exists(download_path):
                 pass
             return download_path
         except Exception as e:
-            logging.warning(f'Failed to download file from {mesh_link}. Error: {e}')
+            logging.warning(f'Failed to download file from {file_link}. Error: {e}')
             return None
 
     @staticmethod

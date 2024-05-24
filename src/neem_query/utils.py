@@ -174,7 +174,7 @@ class RepositorySearch:
         Returns:
         - list of str: List of similar file names found within the repository.
         """
-        stack = self.stack + [self.repository_url]
+        stack = [self.repository_url] + self.stack
         similar_files = []
 
         while stack:

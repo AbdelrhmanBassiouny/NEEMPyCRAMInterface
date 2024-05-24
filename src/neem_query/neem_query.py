@@ -26,6 +26,7 @@ class NeemQuery:
     engine: Engine
     session: Session
     neem_data_link: Optional[str] = "https://neem-data.informatik.uni-bremen.de/data/"
+    urdf_folder: Optional[str] = "kinematics/"
     mesh_folders: Optional[List[str]] = ['pouring_hands_neem/meshes/',
                                          'kitchen_object_meshes/',
                                          'bielefeld_study_neem/meshes/']
@@ -1784,6 +1785,13 @@ class NeemQuery:
         Get the mesh links of the objects.
         """
         return [cls.neem_data_link + folder for folder in cls.mesh_folders]
+
+    @classmethod
+    def _get_urdf_link(cls):
+        """
+        Get the link to the folder where all NEEM URDFs are stored.
+        """
+        return cls.neem_data_link + cls.urdf_folder
 
     def reset(self):
         """
