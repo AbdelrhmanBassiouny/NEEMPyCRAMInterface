@@ -22,12 +22,12 @@ from pycram.process_module import simulated_robot
 from pycram.robot_descriptions import robot_description
 from pycram.world import World
 from pycram.world_concepts.world_object import Object
-from neem_pycram_interface.enums import ColumnLabel as CL
-from .neem_interface import NeemInterface
-from .neem_query import NeemQuery
-from .neems_database import *
-from .query_result import QueryResult
-from .utils import RepositorySearch
+from neem_query.enums import ColumnLabel as CL
+from neem_query.neem_interface import NeemInterface
+from neem_query.neem_query import NeemQuery
+from neem_query.neems_database import *
+from neem_query.query_result import QueryResult
+from neem_query.utils import RepositorySearch
 
 
 @dataclass
