@@ -1,1 +1,1 @@
-from .neem_query import *
+from .neem_pycram_interface import *

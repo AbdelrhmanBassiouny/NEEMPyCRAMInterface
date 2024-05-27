@@ -1,5 +1,5 @@
-from neem_query.neem_pycram_interface import PyCRAMNEEMInterface
-from neem_query.neem_segmentor import NEEMSegmentor
+from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface
+from neem_pycram_interface.neem_segmentor import NEEMSegmentor
 from unittest import TestCase
 
 from pycram.ros.viz_marker_publisher import VizMarkerPublisher

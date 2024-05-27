@@ -1,6 +1,6 @@
 from unittest import TestCase
-from neem_query.neem_query import NeemQuery
-from neem_query.utils import RepositorySearch
+from neem_pycram_interface.neem_query import NeemQuery
+from neem_pycram_interface.utils import RepositorySearch
 
 
 class TestUtils(TestCase):

@@ -22,7 +22,7 @@ from pycram.process_module import simulated_robot
 from pycram.robot_descriptions import robot_description
 from pycram.world import World
 from pycram.world_concepts.world_object import Object
-from .enums import ColumnLabel as CL
+from neem_pycram_interface.enums import ColumnLabel as CL
 from .neem_interface import NeemInterface
 from .neem_query import NeemQuery
 from .neems_database import *
