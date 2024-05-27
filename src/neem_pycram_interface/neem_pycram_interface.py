@@ -232,7 +232,16 @@ class PyCRAMNEEMInterface(NeemInterface):
         task = self.get_result().get_tasks(unique=True)[0]
 
         participant_designators, robot_designator = self.set_pre_task_state(task, sql_neem_id)
-        participant_designator = list(participant_designators.values())[0]
+        participant_designator = None
+        for participant_designator in participant_designators.values():
+            if 'hand' in participant_designator.resolve().world_object.name.lower():
+                # skip vr hand
+                continue
+            else:
+                participant_designator = participant_designator
+                break
+        if participant_designator is None:
+            raise ValueError('No participant found')
 
         with simulated_robot():
 
@@ -614,14 +623,24 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.query_neems_motion_replay_data(sql_neem_id=sql_neem_id).filter_by_task_types([task], regexp=True)
         self.replay_motions_in_query()
 
-    def replay_motions_in_query(self, query_result: Optional[QueryResult] = None,
-                                yield_objects: Optional[bool] = False) -> Union[Generator[Object, None, None], None]:
+    def replay_motions_in_query(self, query_result: Optional[QueryResult] = None) -> None:
         """
         Replay NEEMs using PyCRAM. The query should contain:
          environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         :param query_result: the query result to replay the motions from.
-        :param yield_objects: whether to yield the objects or not.
+        """
+
+        neem_motion_generator = self.yield_motions_in_query(query_result)
+        for obj in neem_motion_generator:
+            pass
+
+    def yield_motions_in_query(self, query_result: Optional[QueryResult] = None) -> Generator[Object, None, None]:
+        """
+        Yiled NEEMs Motion using PyCRAM. The query should contain:
+         environment, participant, translation, orientation, stamp.
+         One could use the get_motion_replay_data method to get the data. Then filter it as needed.
+        :param query_result: the query result to replay the motions from.
         """
 
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
@@ -645,8 +664,7 @@ class PyCRAMNEEMInterface(NeemInterface):
                 moved_participants.append(participant)
             if not all([p in moved_participants for p in unique_participants]):
                 continue
-            if yield_objects:
-                yield participant_objects[participant]
+            yield participant_objects[participant]
 
     def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """

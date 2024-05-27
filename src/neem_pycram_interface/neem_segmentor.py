@@ -15,7 +15,7 @@ class NEEMSegmentor:
         :param sql_neem_id: The ID of the NEEM in the SQL database.
         """
         self.pni.query_neems_motion_replay_data(sql_neem_id=sql_neem_id)
-        obj_gen = self.pni.replay_motions_in_query(yield_objects=True)
+        obj_gen = self.pni.yield_motions_in_query()
         hand_obj = None
         for obj in obj_gen:
             if hand_obj is None:

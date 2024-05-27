@@ -37,6 +37,7 @@ class TestNeemPycramInterface(TestCase):
 
     def tearDown(self):
         self.pni.reset()
+        self.world.reset_world()
 
     def get_pouring_action_data(self):
         query = (self.pni.query_task_motion_data(['Pour'], regexp=True).
@@ -192,6 +193,6 @@ class TestNeemPycramInterface(TestCase):
     def test_redo_grasping_action_for_neem(self):
         self.pni.redo_grasping_action(14)
 
-    # @skip("Working but it is slow")
+    @skip("Working but it is slow")
     def test_motion_replay(self):
         self.pni.replay_motion_of_neem(14)
