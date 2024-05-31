@@ -1,13 +1,13 @@
-import threading
 import queue
+import threading
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
 
-import pybullet
-from typing_extensions import Callable, Optional, Any, List, Union
+import numpy as np
+from tf.transformations import quaternion_inverse, quaternion_multiply
+from typing_extensions import Optional, List, Union, Dict
 
-from pycram.datastructures.dataclasses import ClosestPoint, ContactPoint
+from pycram.datastructures.dataclasses import ContactPoint
 from pycram.datastructures.enums import WorldMode
 from pycram.world import World
 from pycram.world_concepts.world_object import Object, Link
@@ -40,35 +40,67 @@ class NEEMSegmentor:
                 print(f"Object position: {obj_in_contact.get_position()}")
 
 
+class Event:
+    def __init__(self, timestamp: Optional[float] = None):
+        self.timestamp = time.time() if timestamp is None else timestamp
+
+
+class ContactEvent(Event):
+    def __init__(self, contact_points: List[ContactPoint], timestamp: Optional[float] = None):
+        super().__init__(timestamp)
+        self.contact_points = contact_points
+
+    def __str__(self):
+        return f"Contact event: {[str(cp) for cp in self.contact_points]}"
+
+    def __repr__(self):
+        return self.__str__()
+
+
+class PickUpEvent(Event):
+    def __init__(self, hand: Object, picked_object: Object, timestamp: Optional[float] = None):
+        super().__init__(timestamp)
+        self.hand = hand
+        self.object = picked_object
+
+    def __str__(self):
+        return f"Pick up event: Hand:{self.hand.name}, Object: {self.object.name}, Timestamp: {self.timestamp}"
+
+    def __repr__(self):
+        return self.__str__()
+
+
 class EventLogger:
     def __init__(self):
-        self.timeline = []
+        self.timeline = {}
         self.event_queue = queue.Queue()
         self.lock = threading.Lock()
 
-    def log_event(self, thread_id, event):
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if isinstance(event, list):
-            log_event = [str(e) for e in event]
-        else:
-            log_event = event
-        log_entry = f"Thread {thread_id} detected {log_event} at {timestamp}"
-        self.event_queue.put(event)
+    def log_event(self, thread_id, event: Event):
+        self.event_queue.put((thread_id, event))
         with self.lock:
-            self.timeline.append(log_entry)
+            if thread_id not in self.timeline:
+                self.timeline[thread_id] = []
+            self.timeline[thread_id].append(event)
 
-    def get_events(self):
+    def get_events(self) -> Dict[int, Event]:
         with self.lock:
-            events = self.timeline[:]
+            events = self.timeline.copy()
         return events
+
+    def get_latest_event_of_thread(self, thread_id: int):
+        with self.lock:
+            if thread_id not in self.timeline:
+                return None
+            return self.timeline[thread_id][-1]
 
     def get_next_event(self):
         try:
-            event = self.event_queue.get(block=False)
+            thread_id, event = self.event_queue.get(block=False)
             self.event_queue.task_done()
-            return event
+            return thread_id, event
         except queue.Empty:
-            return None
+            return None, None
 
     def join(self):
         self.event_queue.join()
@@ -88,7 +120,7 @@ class NEEMPlayer(threading.Thread):
         return self.pni.replay_environment_initialized
 
     def run(self):
-        self.pni.replay_motions_in_query(real_time=False)
+        self.pni.replay_motions_in_query(real_time=True)
         self.world.exit()
 
 
@@ -98,6 +130,7 @@ class EventDetector(threading.Thread, ABC):
     and returns an object that represents the event. The event detector is called in a loop until the thread is stopped
     by setting the exit_thread attribute to True.
     """
+
     def __init__(self, thread_id: int, logger: EventLogger,
                  wait_time: Optional[float] = None):
         """
@@ -113,9 +146,10 @@ class EventDetector(threading.Thread, ABC):
         self.wait_time = wait_time
 
         self.exit_thread: Optional[bool] = False
+        self.run_once = False
 
     @abstractmethod
-    def detect_event(self) -> Any:
+    def detect_event(self) -> Event:
         """
         The event detector function that is called in a loop until the thread is stopped.
         :return: An object that represents the event.
@@ -134,14 +168,15 @@ class EventDetector(threading.Thread, ABC):
                 time.sleep(self.wait_time)
             if event is not None:
                 self.log_event(event)
+            if self.run_once:
+                break
 
-    def log_event(self, event: Any) -> None:
+    def log_event(self, event: Event) -> None:
         """
         Logs the event using the logger instance.
         :param event: An object that represents the event.
         :return: None
         """
-        # print(f"Thread {self.thread_id} detected event: {event}")
         self.logger.log_event(self.thread_id, event)
 
 
@@ -165,7 +200,7 @@ class ContactDetector(EventDetector):
         self.with_object = with_object
         self.max_closeness_distance = max_closeness_distance
 
-    def detect_event(self) -> Union[List[ClosestPoint], None]:
+    def detect_event(self) -> Union[ContactEvent, None]:
         """
         Detects the closest points between the object to track and another object in the scene if the with_object
         attribute is set, else, between the object to track and all other objects in the scene.
@@ -175,13 +210,109 @@ class ContactDetector(EventDetector):
         else:
             contact_points = self.object_to_track.closest_points(self.max_closeness_distance)
         if len(contact_points) > 0:
-            return contact_points
+            return ContactEvent(contact_points)
+        else:
+            return None
+
+
+class PickUpDetector(EventDetector):
+    def __init__(self, thread_id: int,
+                 logger: EventLogger,
+                 hand_link: Link,
+                 object_link: Link,
+                 hand_contact_thread_id: int,
+                 obj_contact_thread_id: int,
+                 trans_threshold: Optional[float] = 0.08,
+                 rot_threshold: Optional[float] = 0.4
+                 ):
+        """
+        :param thread_id: An integer that identifies the thread.
+        :param logger: An instance of the EventLogger class that is used to log the events.
+        :param hand_link: An instance of the Link class that represents the hand link.
+        :param object_link: An instance of the Link class that represents the object link.
+        """
+        super().__init__(thread_id, logger)
+        self.hand_link = hand_link
+        self.object_link = object_link
+        self.hand_contact_thread_id = hand_contact_thread_id
+        self.obj_contact_thread_id = obj_contact_thread_id
+        self.trans_threshold = trans_threshold
+        self.rot_threshold = rot_threshold
+        self.run_once = True
+
+    def detect_event(self):
+        pick_up_event = PickUpEvent(self.hand_link.object, self.object_link.object)
+        # measure translation, rotation between the two objects and detect all their contacts
+        # at the time of contact with each other.
+        transform_hand_obj = self.hand_link.get_transform_to_link(self.object_link)
+        trans_1 = transform_hand_obj.translation_as_list()
+        quat_1 = transform_hand_obj.rotation_as_list()
+        initial_obj_contact_event = None
+        while initial_obj_contact_event is None:
+            initial_obj_contact_event = self.logger.get_latest_event_of_thread(self.obj_contact_thread_id)
+            time.sleep(0.01)
+        points_with_other_objects = [point for point in initial_obj_contact_event.contact_points
+                                     if point.link_b.object != self.hand_link.object]
+        objects_other_than_hand_at_contact = set([point.link_b.object.name for point in points_with_other_objects])
+
+        # Do that again after some time.
+        time.sleep(4)
+        transform_hand_obj = self.hand_link.get_transform_to_link(self.object_link)
+        trans_2 = transform_hand_obj.translation_as_list()
+        quat_2 = transform_hand_obj.rotation_as_list()
+
+        # Indicative conditions:
+
+        # 1. the change in translation and rotation should be small if the object was picked up
+        trans_diff_cond = all([abs(t1 - t2) <= self.trans_threshold for t1, t2 in zip(trans_1, trans_2)])
+        quat_diff = quaternion_multiply(quaternion_inverse(quat_1), quat_2)
+        quat_diff_angle = 2 * np.arctan2(np.linalg.norm(quat_diff[0:3]), quat_diff[3])
+        rot_diff_cond = quat_diff_angle <= self.rot_threshold
+        print(f"trans_diff_cond {trans_diff_cond}, rot_diff_cond {rot_diff_cond}")
+
+        # 2. the contact should still be there
+        latest_contact_event = self.logger.get_latest_event_of_thread(self.hand_contact_thread_id)
+        contact_points = latest_contact_event.contact_points
+        obj_in_contact = [point.link_b.object for point in contact_points]
+        contact_cond = self.object_link.object in obj_in_contact
+        print(f"contact_cond {contact_cond}")
+
+        # 3. while the object that is picked should lose contact with the surface.
+        new_obj_contact_event = self.logger.get_latest_event_of_thread(self.obj_contact_thread_id)
+        new_points_with_other_objects = [point for point in new_obj_contact_event.contact_points
+                                         if point.link_b.object != self.hand_link.object]
+        new_objects_other_than_hand_at_contact = set(
+            [point.link_b.object.name for point in new_points_with_other_objects])
+        print(f"objects_other_than_hand_at_contact {objects_other_than_hand_at_contact}")
+        print(f"new_objects_other_than_hand_at_contact {new_objects_other_than_hand_at_contact}")
+        objects_that_lost_contact = objects_other_than_hand_at_contact - new_objects_other_than_hand_at_contact
+        supporting_surface = None
+        opposite_gravity = [0, 0, 9.81]
+        smallest_angle = np.pi / 4
+        for obj in objects_that_lost_contact:
+            points_with_obj = [point for point in points_with_other_objects if point.link_b.object.name == obj]
+            normals = [point.normal_on_b for point in points_with_obj]
+            for normal in normals:
+                # check if normal is pointing upwards opposite to gravity by finding the angle between the normal
+                # and gravity vector.
+                angle = np.arccos(np.dot(normal, opposite_gravity) /
+                                  (np.linalg.norm(normal) * np.linalg.norm(opposite_gravity)))
+                print(f"Angle between normal and gravity: {angle}")
+                if angle < smallest_angle:
+                    smallest_angle = angle
+                    supporting_surface = obj
+        supporting_surface_cond = supporting_surface is not None
+        print(f"supporting_surface_cond {supporting_surface_cond}")
+
+        pick_up_cond = trans_diff_cond and rot_diff_cond and contact_cond and supporting_surface_cond
+        if pick_up_cond:
+            print(f"Object picked up: {self.object_link.object.name}")
+            return pick_up_event
         else:
             return None
 
 
 def run_event_detectors():
-
     logger = EventLogger()
     pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
     neem_player_thread = NEEMPlayer(pni)
@@ -201,20 +332,36 @@ def run_event_detectors():
 
     tracked_objects = [event['object_to_track'] for event in all_contact_events_to_look_for]
     avoid_objects = ['particle', 'floor', 'kitchen']
+    pick_up_thread_initialized = False
     while neem_player_thread.is_alive() or logger.event_queue.unfinished_tasks > 0:
-        next_event = logger.get_next_event()
+        thread_id, next_event = logger.get_next_event()
         if next_event is None:
             time.sleep(0.01)
             continue
-        for point in next_event:
+        if not isinstance(next_event, ContactEvent):
+            continue
+        for point in next_event.contact_points:
             obj_in_contact = point.link_b.object
+            obj_a = point.link_a.object
             if (obj_in_contact not in tracked_objects and
                     all([k not in obj_in_contact.name.lower() for k in avoid_objects])):
                 print(f"Creating new thread for object {obj_in_contact.name}")
+                thread_id = len(contact_detector_threads)
+                # print(f"Thread ID: {thread_id} for object {obj_in_contact.name}")
                 detector_thread = ContactDetector(len(contact_detector_threads), logger, obj_in_contact)
                 detector_thread.start()
                 contact_detector_threads.append(detector_thread)
                 tracked_objects.append(obj_in_contact)
+            if (obj_a == hand and obj_in_contact in tracked_objects and obj_in_contact.name == 'SM_MilkPitcher_1' and
+                    not pick_up_thread_initialized):
+                obj_thread_id = tracked_objects.index(obj_in_contact)
+                # print(f"Thread ID for object {obj_in_contact.name}: {obj_thread_id}")
+                pick_up_detector = PickUpDetector(99,
+                                                  logger, point.link_a, point.link_b,
+                                                  0, obj_thread_id)
+                pick_up_detector.start()
+                print(f"Creating pick up detector for object {obj_in_contact.name}")
+                pick_up_thread_initialized = True
 
     logger.join()
     neem_player_thread.join()
@@ -225,10 +372,8 @@ def run_event_detectors():
 
     print("All threads have exited")
     print("Events:")
-    print(logger.get_events())
+    print('\n'.join(logger.get_events()))
 
 
 if __name__ == "__main__":
     run_event_detectors()
-
-
