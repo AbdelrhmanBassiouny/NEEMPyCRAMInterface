@@ -7,7 +7,7 @@ from urllib import request
 
 import rospy
 from sqlalchemy import and_
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Generator
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Generator, Set
 
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
@@ -27,7 +27,7 @@ from neem_query.neem_interface import NeemInterface
 from neem_query.neem_query import NeemQuery
 from neem_query.neems_database import *
 from neem_query.query_result import QueryResult
-from neem_query.utils import RepositorySearch
+from .utils import RepositorySearch
 
 
 @dataclass
@@ -153,6 +153,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.all_data_dirs = World.data_directory
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
         self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
+        self.replay_environment_initialized = False
 
     @classmethod
     def from_pycram_neem_interface(cls, pycram_neem_interface: 'PyCRAMNEEMInterface'):
@@ -623,26 +624,16 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.query_neems_motion_replay_data(sql_neem_id=sql_neem_id).filter_by_task_types([task], regexp=True)
         self.replay_motions_in_query()
 
-    def replay_motions_in_query(self, query_result: Optional[QueryResult] = None) -> None:
+    def replay_motions_in_query(self, query_result: Optional[QueryResult] = None,
+                                real_time: Optional[bool] = True) -> None:
         """
-        Replay NEEMs using PyCRAM. The query should contain:
+        Replay NEEMs Motion using PyCRAM. The query should contain:
          environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         :param query_result: the query result to replay the motions from.
+        :param real_time: whether to replay the motions in real time or not.
         """
-
-        neem_motion_generator = self.yield_motions_in_query(query_result)
-        for obj in neem_motion_generator:
-            pass
-
-    def yield_motions_in_query(self, query_result: Optional[QueryResult] = None) -> Generator[Object, None, None]:
-        """
-        Yiled NEEMs Motion using PyCRAM. The query should contain:
-         environment, participant, translation, orientation, stamp.
-         One could use the get_motion_replay_data method to get the data. Then filter it as needed.
-        :param query_result: the query result to replay the motions from.
-        """
-
+        query_result = query_result if query_result is not None else self.get_result()
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
 
         motion_data = self.get_participant_motion_data(query_result)
@@ -650,21 +641,34 @@ class PyCRAMNEEMInterface(NeemInterface):
         times = motion_data.times
         participant_instances = motion_data.entity_instances
         unique_participants = list(set(participant_instances))
-        moved_participants = []
+        moved_participants = set()
         prev_time = 0
         for participant, pose, current_time in zip(participant_instances, poses, times):
             if prev_time > 0:
                 wait_time = current_time - prev_time
                 if wait_time > 1:
                     wait_time = 1
-                time.sleep(wait_time)
+                if real_time:
+                    time.sleep(wait_time)
             prev_time = current_time
             participant_objects[participant].set_pose(pose)
-            if participant not in moved_participants and pose != Pose():
-                moved_participants.append(participant)
-            if not all([p in moved_participants for p in unique_participants]):
-                continue
-            yield participant_objects[participant]
+            if not self.replay_environment_initialized:
+                if pose != Pose():
+                    moved_participants.add(participant)
+                if self._all_participants_moved(unique_participants, moved_participants):
+                    self.replay_environment_initialized = True
+
+        self.replay_environment_initialized = False
+
+    @staticmethod
+    def _all_participants_moved(unique_participants: List[str], moved_participants: Set[str]) -> bool:
+        """
+        Check if all participants have moved.
+        :param unique_participants: the unique participants.
+        :param moved_participants: the moved participants.
+        :return: whether all participants have moved.
+        """
+        return all([p in moved_participants for p in unique_participants])
 
     def get_participant_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
