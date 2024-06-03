@@ -51,8 +51,11 @@ class ContactEvent(Event):
         super().__init__(timestamp)
         self.contact_points = contact_points
 
+    def object_names_in_contact(self):
+        return [obj_name for obj_name in self.contact_points.get_names_of_objects_that_have_points()]
+
     def __str__(self):
-        return f"Contact event: {[str(cp) for cp in self.contact_points]}"
+        return f"Contact event: {[obj_name for obj_name in self.object_names_in_contact()]}"
 
     def __repr__(self):
         return self.__str__()
@@ -65,8 +68,14 @@ class LossOfContactEvent(Event):
         self.contact_points = contact_points
         self.latest_contact_points = latest_contact_points
 
+    def object_names_lost_contact(self):
+        return [obj_name for obj_name in self.contact_points.get_objects_that_got_removed(self.latest_contact_points)]
+
+    def objects_lost_contact(self):
+        return self.contact_points.get_objects_that_got_removed(self.latest_contact_points)
+
     def __str__(self):
-        return f"Loss of contact event: {[str(cp) for cp in self.contact_points]}"
+        return f"Loss of contact event: {[obj_name for obj_name in self.object_names_lost_contact()]}"
 
     def __repr__(self):
         return self.__str__()
@@ -362,6 +371,9 @@ class PickUpDetector(EventDetector):
         # detect all their contacts at the time of contact with each other.
         initial_contact_event = self.get_latest_contact_event(self.object)
         initial_contact_points = initial_contact_event.contact_points
+        if not initial_contact_points.is_object_in_the_list(self.hand):
+            print(f"Hand not in contact with object: {self.object_link.object.name}")
+            return
 
         pick_up_event = PickUpEvent(self.hand_link.object, self.object_link.object, initial_contact_event.timestamp)
         latest_stamp = pick_up_event.timestamp
@@ -370,12 +382,12 @@ class PickUpDetector(EventDetector):
         while not supporting_surface_found:
             time.sleep(0.01)
             loss_of_contact_event = self.get_latest_loss_of_contact_event(self.object, latest_stamp)
-            latest_stamp = loss_of_contact_event.timestamp
             loss_of_contact_points = loss_of_contact_event.contact_points
 
             objects_that_lost_contact = loss_of_contact_points.get_objects_that_got_removed(initial_contact_points)
-
+            print(f"object_in_contact: {self.object.name}")
             if len(objects_that_lost_contact) == 0:
+                print(f"continue, object: {self.object.name}")
                 continue
             if self.hand in objects_that_lost_contact:
                 print(f"Hand lost contact with object: {self.object_link.object.name}")
@@ -386,6 +398,9 @@ class PickUpDetector(EventDetector):
             if supporting_surface_found:
                 pick_up_event.record_end_timestamp()
                 break
+            else:
+                print(f"Supporting surface not found, object: {self.object.name}")
+                continue
 
         print(f"Object picked up: {self.object_link.object.name}")
 
@@ -431,6 +446,21 @@ class PickUpDetector(EventDetector):
         """
         return self.get_latest_contact_event(obj).contact_points
 
+    def get_latest_contact_event_between_hand_and_obj(self) -> ContactEvent:
+        """
+        Gets the latest contact event from the logger.
+        :return: An instance of the ContactEvent class that represents the contact event.
+        """
+        hand_thread_id = ContactDetector.thread_prefix + str(self.hand.id)
+        all_events = self.logger.get_events()
+        latest_contact_event = None
+        for event in reversed(all_events[hand_thread_id]):
+            if event.contact_points.is_object_in_the_list(self.object):
+                latest_contact_event = event
+                break
+        assert latest_contact_event is not None, f"No contact event for {self.hand.name} and {self.object.name}"
+        return latest_contact_event
+
     def get_latest_contact_event(self, obj: Object) -> ContactEvent:
         """
         Gets the latest contact event from the logger.
@@ -465,12 +495,11 @@ class PickUpDetector(EventDetector):
         thread_id = LossOfContactDetector.thread_prefix + str(obj.id)
         while latest_loss_contact_event is None:
             latest_loss_contact_event = self.logger.get_latest_event_of_thread(thread_id)
-            if latest_loss_contact_event is None:
-                time.sleep(0.01)
-                continue
-            else:
+            if latest_loss_contact_event is not None:
                 latest_loss_contact_event = None if latest_loss_contact_event.timestamp < after_timestamp else \
                     latest_loss_contact_event
+            if latest_loss_contact_event is None:
+                time.sleep(0.01)
         return latest_loss_contact_event
 
     def calculate_transform_difference_and_check_if_small(self, transform_1: Transform, transform_2: Transform) \
@@ -576,12 +605,14 @@ def run_event_detectors():
         time.sleep(0.1)
 
     hand = [obj for obj in World.current_world.objects if "hand" in obj.name.lower()][0]
+    # kitchen = [obj for obj in World.current_world.objects if "kitchen" in obj.name.lower()][0]
     all_contact_events_to_look_for = [{'object_to_track': hand}]
     detector_threads = []
     for i, event in enumerate(all_contact_events_to_look_for):
-        detector_thread = ContactDetector(logger, **event)
-        detector_thread.start()
-        detector_threads.append(detector_thread)
+        for detector in (ContactDetector, LossOfContactDetector):
+            detector_thread = detector(logger, **event)
+            detector_thread.start()
+            detector_threads.append(detector_thread)
 
     tracked_objects = [event['object_to_track'] for event in all_contact_events_to_look_for]
     avoid_objects = ['particle', 'floor', 'kitchen']
@@ -593,44 +624,45 @@ def run_event_detectors():
             continue
         if not isinstance(next_event, ContactEvent):
             continue
-        for point in next_event.contact_points:
-            obj_in_contact = point.link_b.object
-            obj_a = point.link_a.object
+        objects_in_contact = next_event.contact_points.get_objects_that_have_points()
+        # if isinstance(next_event, LossOfContactEvent):
+        #     objects_lost_contact = next_event.objects_lost_contact()
+        obj_a = next_event.contact_points[0].link_a.object
+        link_a = next_event.contact_points[0].link_a
+        for obj_in_contact in objects_in_contact:
             if any([k in obj_in_contact.name.lower() for k in avoid_objects]):
                 continue
             if obj_in_contact not in tracked_objects:
                 print(f"Creating new thread for object {obj_in_contact.name}")
-
-                detector_thread = ContactDetector(logger, obj_in_contact)
-                detector_thread.start()
-                detector_threads.append(detector_thread)
-
-                loss_contact_thread = LossOfContactDetector(logger, obj_in_contact)
-                loss_contact_thread.start()
-                detector_threads.append(loss_contact_thread)
+                for detector in (ContactDetector, LossOfContactDetector):
+                    detector_thread = detector(logger, obj_in_contact)
+                    detector_thread.start()
+                    detector_threads.append(detector_thread)
 
                 tracked_objects.append(obj_in_contact)
             if obj_a == hand:
-                if obj_in_contact in pick_up_detectors:
+                if obj_in_contact in pick_up_detectors.keys():
                     if (pick_up_detectors[obj_in_contact].is_alive() or
-                            pick_up_detectors[obj_in_contact].thread_id in logger.get_events()):
+                            pick_up_detectors[obj_in_contact].thread_id in logger.get_events().keys()):
                         continue
-                pick_up_detector = PickUpDetector(logger, point.link_a, point.link_b)
+                link_b = next_event.contact_points.get_links_in_contact_of_object(obj_in_contact)[0]
+                pick_up_detector = PickUpDetector(logger, link_a, link_b)
                 pick_up_detector.start()
                 pick_up_detectors[obj_in_contact] = pick_up_detector
                 detector_threads.append(pick_up_detector)
                 print(f"Creating pick up detector for object {obj_in_contact.name}")
 
-    logger.join()
     neem_player_thread.join()
 
     for detector_thread in detector_threads:
         detector_thread.exit_thread = True
         detector_thread.join()
 
+    logger.join()
+
     print("All threads have exited")
     print("Events:")
-    print('\n'.join(logger.get_events()))
+    print('\n'.join([' '.join([str(v) for v in values]) for values in logger.get_events().values()]))
 
 
 if __name__ == "__main__":
