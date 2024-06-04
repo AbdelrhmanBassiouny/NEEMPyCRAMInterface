@@ -1,5 +1,5 @@
 from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface
-from neem_pycram_interface.neem_segmentor import NEEMSegmentor, run_event_detectors_on_neem
+from neem_pycram_interface.neem_segmentor import NEEMSegmentor
 from unittest import TestCase
 
 from pycram.ros.viz_marker_publisher import VizMarkerPublisher
@@ -22,9 +22,6 @@ class TestNEEMSegmentor(TestCase):
         if World.current_world is not None:
             World.current_world.exit()
 
-    def test_detect_contacts_from_neem_motion_replay(self):
-        self.ns.detect_contacts_from_neem_motion_replay(17)
-
     def test_event_detector(self):
-        run_event_detectors_on_neem([17])
+        self.ns.run_event_detectors_on_neem([17], annotate_events=True)
 
