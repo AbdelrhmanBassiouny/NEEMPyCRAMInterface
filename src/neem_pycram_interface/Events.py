@@ -144,7 +144,7 @@ class EventLogger:
         self.lock = threading.Lock()
         self.annotate_events = annotate_events
         if annotate_events:
-            self.annotation_queue = queue.Queue(5)
+            self.annotation_queue = queue.Queue()
             self.annotation_thread = EventAnnotationThread(self)
             self.annotation_thread.start()
 
@@ -182,8 +182,8 @@ class EventLogger:
 
     def join(self):
         if self.annotate_events:
-            self.annotation_queue.join()
             self.annotation_thread.stop()
+            self.annotation_queue.join()
         self.event_queue.join()
 
     def __str__(self):
@@ -197,18 +197,22 @@ class EventAnnotationThread(threading.Thread):
                  max_annotations: int = 5):
         super().__init__()
         self.logger = logger
-        self.stop_event = threading.Event()
         self.initial_z_offset = initial_z_offset
         self.step_z_offset = step_z_offset
         self.current_annotations: List[TextAnnotation] = []
         self.max_annotations = max_annotations
+        self.exit = False
 
     def get_next_z_offset(self):
         return self.initial_z_offset - self.step_z_offset * len(self.current_annotations)
 
     def run(self):
-        while not self.stop_event.is_set():
-            event = self.logger.annotation_queue.get()
+        while not self.exit:
+            try:
+                event = self.logger.annotation_queue.get(timeout=1)
+            except queue.Empty:
+                continue
+            self.logger.annotation_queue.task_done()
             if len(self.current_annotations) >= self.max_annotations:
                 # Move all annotations up and remove the oldest one
                 for text_ann in self.current_annotations:
@@ -222,9 +226,8 @@ class EventAnnotationThread(threading.Thread):
             z_offset = self.get_next_z_offset()
             text_ann = event.annotate([1.5, 1, z_offset])
             self.current_annotations.append(text_ann)
-            self.logger.annotation_queue.task_done()
             time.sleep(0.1)
 
     def stop(self):
-        self.stop_event.set()
+        self.exit = True
         self.join()

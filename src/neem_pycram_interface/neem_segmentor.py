@@ -3,13 +3,11 @@ import time
 
 from typing_extensions import Optional, List
 
-from pycram.datastructures.enums import WorldMode
 from pycram.world import World
 from pycram.world_concepts.world_object import Object, Link
-from pycram.worlds.bullet_world import BulletWorld
 from .neem_pycram_interface import PyCRAMNEEMInterface
 
-from .Events import ContactEvent, PickUpEvent, EventLogger
+from .Events import ContactEvent, EventLogger
 from .EventDetectors import ContactDetector, LossOfContactDetector, PickUpDetector
 
 
@@ -25,7 +23,6 @@ class NEEMSegmentor:
         :param pycram_neem_interface: The neem pycram interface object used to query the NEEMs motion replay data.
         """
         self.pni = pycram_neem_interface
-        self.world = BulletWorld(mode=WorldMode.GUI)
         self.avoid_objects = ['particle', 'floor', 'kitchen']
         self.tracked_objects = []
         self.detector_threads = []
@@ -157,7 +154,6 @@ class NEEMPlayer(threading.Thread):
     def __init__(self, pycram_neem_interface: PyCRAMNEEMInterface):
         super().__init__()
         self.pni = pycram_neem_interface
-        self.world = BulletWorld(mode=WorldMode.DIRECT)
 
     def query_neems_motion_replay_data(self, sql_neem_ids: List[int]):
         self.pni.query_neems_motion_replay_data(sql_neem_ids=sql_neem_ids)
@@ -168,4 +164,3 @@ class NEEMPlayer(threading.Thread):
 
     def run(self):
         self.pni.replay_motions_in_query(real_time=True)
-        self.world.exit()

@@ -2,8 +2,10 @@ from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface
 from neem_pycram_interface.neem_segmentor import NEEMSegmentor
 from unittest import TestCase
 
+from pycram.datastructures.enums import WorldMode
 from pycram.ros.viz_marker_publisher import VizMarkerPublisher
 from pycram.world import World
+from pycram.worlds.bullet_world import BulletWorld
 
 
 class TestNEEMSegmentor(TestCase):
@@ -12,6 +14,7 @@ class TestNEEMSegmentor(TestCase):
 
     @classmethod
     def setUpClass(cls):
+        BulletWorld(WorldMode.GUI)
         pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
         cls.ns = NEEMSegmentor(pni, annotate_events=True)
         cls.viz_mark_publisher = VizMarkerPublisher()
@@ -23,5 +26,5 @@ class TestNEEMSegmentor(TestCase):
             World.current_world.exit()
 
     def test_event_detector(self):
-        self.ns.run_event_detectors_on_neem([17])
+        self.ns.run_event_detectors_on_neem([15])
 
