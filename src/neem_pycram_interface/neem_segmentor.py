@@ -19,7 +19,7 @@ class NEEMSegmentor:
     loss of contact, and pick up events.
     """
 
-    def __init__(self, pycram_neem_interface: PyCRAMNEEMInterface):
+    def __init__(self, pycram_neem_interface: PyCRAMNEEMInterface, annotate_events: bool = False):
         """
         Initializes the NEEMSegmentor class.
         :param pycram_neem_interface: The neem pycram interface object used to query the NEEMs motion replay data.
@@ -29,7 +29,7 @@ class NEEMSegmentor:
         self.avoid_objects = ['particle', 'floor', 'kitchen']
         self.tracked_objects = []
         self.detector_threads = []
-        self.logger = EventLogger()
+        self.logger = EventLogger(annotate_events)
         self.neem_player_thread = NEEMPlayer(self.pni)
         self.pick_up_detectors = {}
 
@@ -44,12 +44,10 @@ class NEEMSegmentor:
         while not self.neem_player_thread.ready:
             time.sleep(0.1)
 
-    def run_event_detectors_on_neem(self, sql_neem_ids: Optional[List[int]] = None,
-                                    annotate_events: Optional[bool] = False) -> None:
+    def run_event_detectors_on_neem(self, sql_neem_ids: Optional[List[int]] = None) -> None:
         """
         Runs the event detectors on the NEEMs motion replay data.
         :param sql_neem_ids: An optional list of integer values that represent the SQL NEEM IDs.
-        :param annotate_events: An optional boolean value that represents the condition to annotate the events.
         """
         if sql_neem_ids is None:
             sql_neem_ids = [17]
@@ -66,10 +64,6 @@ class NEEMSegmentor:
                 time.sleep(0.01)
                 continue
 
-            if isinstance(next_event, PickUpEvent):
-                if annotate_events:
-                    next_event.annotate()
-
             if not isinstance(next_event, ContactEvent):
                 continue
 
@@ -79,6 +73,11 @@ class NEEMSegmentor:
         self.logger.print_events()
 
     def handle_contact_event(self, event: ContactEvent, hands: List[Object]) -> None:
+        """
+        Handles the contact event by starting the contact threads for the object and the pickup thread for the object.
+        :param event: The ContactEvent instance that represents the contact event.
+        :param hands: A list of Object instances that represent the hands.
+        """
         objects_in_contact = event.contact_points.get_objects_that_have_points()
         obj_a = event.contact_points[0].link_a.object
         link_a = event.contact_points[0].link_a
@@ -96,6 +95,10 @@ class NEEMSegmentor:
                 self.start_pick_up_thread_for_obj(link_a, link_b)
 
     def start_contact_threads_for_obj_and_update_tracked_objs(self, obj: Object):
+        """
+        Starts the contact threads for the object and updates the tracked objects.
+        :param obj: The Object instance for which the contact threads are started.
+        """
         for detector in (ContactDetector, LossOfContactDetector):
             detector_thread = detector(self.logger, obj)
             detector_thread.start()
@@ -103,6 +106,11 @@ class NEEMSegmentor:
         self.tracked_objects.append(obj)
 
     def start_pick_up_thread_for_obj(self, hand_link: Link, obj_link: Link):
+        """
+        Starts the pickup thread for the object.
+        :param hand_link: The Link instance that represents the hand.
+        :param obj_link: The Link instance that represents the object.
+        """
         obj = obj_link.object
         if obj in self.pick_up_detectors.keys():
             if (self.pick_up_detectors[obj].is_alive() or

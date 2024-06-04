@@ -13,7 +13,7 @@ class TestNEEMSegmentor(TestCase):
     @classmethod
     def setUpClass(cls):
         pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.ns = NEEMSegmentor(pni)
+        cls.ns = NEEMSegmentor(pni, annotate_events=True)
         cls.viz_mark_publisher = VizMarkerPublisher()
 
     @classmethod
@@ -23,5 +23,5 @@ class TestNEEMSegmentor(TestCase):
             World.current_world.exit()
 
     def test_event_detector(self):
-        self.ns.run_event_detectors_on_neem([17], annotate_events=True)
+        self.ns.run_event_detectors_on_neem([17])
 
