@@ -340,7 +340,7 @@ class PyCRAMNEEMInterface(NeemInterface):
             self.spawn_neem_objects_and_get_designators(qr))
         task_start_time = qr.get_time_interval_begin()[0]
         self.query_neems_motion_replay_data(participant_necessary=False, participant_base_link_necessary=False,
-                                            sql_neem_id=sql_neem_id)
+                                            sql_neem_ids=[sql_neem_id])
         self.set_pre_task_participants_state(participant_designators, task_start_time)
         robot = None
         if len(performer_designators) > 0:
@@ -606,14 +606,16 @@ class PyCRAMNEEMInterface(NeemInterface):
             self.filter_by_sql_neem_id([sql_neem_id])
         return self
 
-    def replay_motion_of_neem(self, sql_neem_id: Optional[int] = None):
+    def replay_motion_of_neem(self, sql_neem_ids: Optional[List[int]] = None, real_time: Optional[bool] = True):
         """
         Replay the motions of a NEEM using PyCRAM.
         The query should contain:
          neem_id, participant, translation, orientation, stamp.
+         :param sql_neem_ids: the sql ids of the NEEMs.
+            :param real_time: whether to replay the motions in real time or not.
         """
-        self.query_neems_motion_replay_data(sql_neem_id=sql_neem_id)
-        self.replay_motions_in_query()
+        self.query_neems_motion_replay_data(sql_neem_ids=sql_neem_ids)
+        self.replay_motions_in_query(real_time=real_time)
 
     def replay_motion_of_task_type(self, task: str, sql_neem_id: Optional[int] = None):
         """
