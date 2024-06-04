@@ -1,5 +1,5 @@
 from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface
-from neem_pycram_interface.neem_segmentor import NEEMSegmentor
+from neem_pycram_interface.neem_segmenter import NEEMSegmenter
 from unittest import TestCase
 
 from pycram.datastructures.enums import WorldMode
@@ -9,14 +9,14 @@ from pycram.worlds.bullet_world import BulletWorld
 
 
 class TestNEEMSegmentor(TestCase):
-    ns: NEEMSegmentor
+    ns: NEEMSegmenter
     viz_mark_publisher: VizMarkerPublisher
 
     @classmethod
     def setUpClass(cls):
         BulletWorld(WorldMode.GUI)
         pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
-        cls.ns = NEEMSegmentor(pni, annotate_events=True)
+        cls.ns = NEEMSegmenter(pni, annotate_events=True)
         cls.viz_mark_publisher = VizMarkerPublisher()
 
     @classmethod
