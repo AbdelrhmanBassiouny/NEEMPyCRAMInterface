@@ -7,7 +7,7 @@ import numpy as np
 from tf.transformations import quaternion_inverse, quaternion_multiply
 from typing_extensions import Optional, List, Union, Dict, Tuple
 
-from pycram.datastructures.dataclasses import ContactPoint, ContactPointsList
+from pycram.datastructures.dataclasses import ContactPoint, ContactPointsList, Color
 from pycram.datastructures.enums import WorldMode
 from pycram.datastructures.pose import Transform
 from pycram.world import World
@@ -20,7 +20,7 @@ class NEEMSegmentor:
 
     def __init__(self, pycram_neem_interface: PyCRAMNEEMInterface):
         self.pni = pycram_neem_interface
-        self.world = BulletWorld(mode=WorldMode.DIRECT)
+        self.world = BulletWorld(mode=WorldMode.GUI)
 
     def detect_contacts_from_neem_motion_replay(self, sql_neem_id: int):
         """
@@ -52,10 +52,10 @@ class ContactEvent(Event):
         self.contact_points = contact_points
 
     def object_names_in_contact(self):
-        return [obj_name for obj_name in self.contact_points.get_names_of_objects_that_have_points()]
+        return self.contact_points.get_names_of_objects_that_have_points()
 
     def __str__(self):
-        return f"Contact event: {[obj_name for obj_name in self.object_names_in_contact()]}"
+        return f"Contact {self.contact_points[0].link_a.object.name}: {self.object_names_in_contact()}"
 
     def __repr__(self):
         return self.__str__()
@@ -69,13 +69,13 @@ class LossOfContactEvent(Event):
         self.latest_contact_points = latest_contact_points
 
     def object_names_lost_contact(self):
-        return [obj_name for obj_name in self.contact_points.get_objects_that_got_removed(self.latest_contact_points)]
+        return [obj.name for obj in self.contact_points.get_objects_that_got_removed(self.latest_contact_points)]
 
     def objects_lost_contact(self):
         return self.contact_points.get_objects_that_got_removed(self.latest_contact_points)
 
     def __str__(self):
-        return f"Loss of contact event: {[obj_name for obj_name in self.object_names_lost_contact()]}"
+        return f"Loss of contact {self.latest_contact_points[0].link_a.object.name}: {self.object_names_lost_contact()}"
 
     def __repr__(self):
         return self.__str__()
@@ -145,8 +145,8 @@ class NEEMPlayer(threading.Thread):
         self.pni = pycram_neem_interface
         self.world = BulletWorld(mode=WorldMode.DIRECT)
 
-    def query_neems_motion_replay_data(self, sql_neem_id: int):
-        self.pni.query_neems_motion_replay_data(sql_neem_id=sql_neem_id)
+    def query_neems_motion_replay_data(self, sql_neem_ids: List[int]):
+        self.pni.query_neems_motion_replay_data(sql_neem_ids=sql_neem_ids)
 
     @property
     def ready(self):
@@ -223,7 +223,7 @@ class AbstractContactDetector(EventDetector, ABC):
     def __init__(self, logger: EventLogger,
                  object_to_track: Object,
                  with_object: Optional[Object] = None,
-                 max_closeness_distance: Optional[float] = 0.03,
+                 max_closeness_distance: Optional[float] = 0.05,
                  wait_time: Optional[float] = 0.1):
         """
         :param logger: An instance of the EventLogger class that is used to log the events.
@@ -594,63 +594,79 @@ class PickUpDetector(EventDetector):
         return self.hand_link.get_transform_to_link(self.object_link)
 
 
-def run_event_detectors():
+def run_event_detectors_on_neem(sql_neem_ids: Optional[List[int]] = None):
     logger = EventLogger()
     pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
     neem_player_thread = NEEMPlayer(pni)
-    neem_player_thread.query_neems_motion_replay_data(17)
+    if sql_neem_ids is None:
+        sql_neem_ids = [17]
+    neem_player_thread.query_neems_motion_replay_data(sql_neem_ids)
     neem_player_thread.start()
 
     while not neem_player_thread.ready:
         time.sleep(0.1)
 
-    hand = [obj for obj in World.current_world.objects if "hand" in obj.name.lower()][0]
-    # kitchen = [obj for obj in World.current_world.objects if "kitchen" in obj.name.lower()][0]
-    all_contact_events_to_look_for = [{'object_to_track': hand}]
-    detector_threads = []
-    for i, event in enumerate(all_contact_events_to_look_for):
-        for detector in (ContactDetector, LossOfContactDetector):
-            detector_thread = detector(logger, **event)
-            detector_thread.start()
-            detector_threads.append(detector_thread)
+    world: World = World.current_world
 
+    hands: List[Object] = [obj for obj in World.current_world.objects if "hand" in obj.name.lower()]
+    # kitchen = [obj for obj in World.current_world.objects if "kitchen" in obj.name.lower()][0]
+
+    all_contact_events_to_look_for = [{'object_to_track': hand} for hand in hands]
+    detector_threads = []
     tracked_objects = [event['object_to_track'] for event in all_contact_events_to_look_for]
     avoid_objects = ['particle', 'floor', 'kitchen']
+
+    def start_contact_threads_for_obj(obj: Object):
+        for detector in (ContactDetector, LossOfContactDetector):
+            detector_thread = detector(logger, obj)
+            detector_thread.start()
+            detector_threads.append(detector_thread)
+        tracked_objects.append(obj)
+
+    for i, event in enumerate(all_contact_events_to_look_for):
+        start_contact_threads_for_obj(event['object_to_track'])
+
     pick_up_detectors = {}
+
+    def start_pick_up_thread_for_obj(hand_link: Link, obj_link: Link):
+        obj = obj_link.object
+        if obj in pick_up_detectors.keys():
+            if (pick_up_detectors[obj].is_alive() or
+                    pick_up_detectors[obj].thread_id in logger.get_events().keys()):
+                return
+        pick_up_detector = PickUpDetector(logger, hand_link, obj_link)
+        pick_up_detector.start()
+        pick_up_detectors[obj] = pick_up_detector
+        detector_threads.append(pick_up_detector)
+        print(f"Creating pick up detector for object {obj.name}")
+
     while neem_player_thread.is_alive() or logger.event_queue.unfinished_tasks > 0:
         thread_id, next_event = logger.get_next_event()
         if next_event is None:
             time.sleep(0.01)
             continue
+        if isinstance(next_event, PickUpEvent):
+            world.add_text(f"Picked {next_event.object.name}", next_event.hand.get_position_as_list(),
+                           color=Color(1, 0, 0, 1))
+
         if not isinstance(next_event, ContactEvent):
             continue
+
         objects_in_contact = next_event.contact_points.get_objects_that_have_points()
-        # if isinstance(next_event, LossOfContactEvent):
-        #     objects_lost_contact = next_event.objects_lost_contact()
         obj_a = next_event.contact_points[0].link_a.object
         link_a = next_event.contact_points[0].link_a
         for obj_in_contact in objects_in_contact:
             if any([k in obj_in_contact.name.lower() for k in avoid_objects]):
                 continue
+
+            link_b = next_event.contact_points.get_links_in_contact_of_object(obj_in_contact)[0]
+
             if obj_in_contact not in tracked_objects:
                 print(f"Creating new thread for object {obj_in_contact.name}")
-                for detector in (ContactDetector, LossOfContactDetector):
-                    detector_thread = detector(logger, obj_in_contact)
-                    detector_thread.start()
-                    detector_threads.append(detector_thread)
+                start_contact_threads_for_obj(obj_in_contact)
 
-                tracked_objects.append(obj_in_contact)
-            if obj_a == hand:
-                if obj_in_contact in pick_up_detectors.keys():
-                    if (pick_up_detectors[obj_in_contact].is_alive() or
-                            pick_up_detectors[obj_in_contact].thread_id in logger.get_events().keys()):
-                        continue
-                link_b = next_event.contact_points.get_links_in_contact_of_object(obj_in_contact)[0]
-                pick_up_detector = PickUpDetector(logger, link_a, link_b)
-                pick_up_detector.start()
-                pick_up_detectors[obj_in_contact] = pick_up_detector
-                detector_threads.append(pick_up_detector)
-                print(f"Creating pick up detector for object {obj_in_contact.name}")
+            if obj_a in hands and obj_in_contact not in hands:
+                start_pick_up_thread_for_obj(link_a, link_b)
 
     neem_player_thread.join()
 
@@ -666,4 +682,4 @@ def run_event_detectors():
 
 
 if __name__ == "__main__":
-    run_event_detectors()
+    run_event_detectors_on_neem()
