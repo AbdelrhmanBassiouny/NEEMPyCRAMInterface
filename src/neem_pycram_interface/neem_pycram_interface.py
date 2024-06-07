@@ -148,8 +148,6 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param db_url: the URL to the NEEM database.
         """
         super().__init__(db_url)
-        self.resources_dir: str = os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
-        World.add_resource_path(self.resources_dir)
         self.all_data_dirs = World.data_directory
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
         self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
@@ -914,7 +912,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param participant_names: the participants to search for.
         :return: the download path of the participant mesh file.
         """
-        return self._search_for_file_in_online_repository(self.mesh_repo_search, participant_names)
+        return self._search_for_file_in_online_repository(self.mesh_repo_search, participant_names, ignore=['.mtl'])
 
     def _search_for_urdf_in_online_repository(self, urdf_name: str) -> Union[str, None]:
         """
@@ -925,14 +923,15 @@ class PyCRAMNEEMInterface(NeemInterface):
         return self._search_for_file_in_online_repository(self.urdf_repo_search, [urdf_name])
 
     def _search_for_file_in_online_repository(self, repo_search_obj: RepositorySearch,
-                                              file_names: List[str]) -> Union[str, None]:
+                                              file_names: List[str], ignore: Optional[List[str]] = None) -> Union[str, None]:
         """
         Search for a file in the online repository.
         :param repo_search_obj: the repository search object to use.
         :param file_names: the files to search for.
+        :param ignore: the patterns in filenames to ignore if the filename has that pattern(s).
         :return: the download path of the file.
         """
-        file_names = repo_search_obj.search_similar_file_names(file_names, find_all=False)
+        file_names = repo_search_obj.search_similar_file_names(file_names, ignore=ignore, find_all=False)
         if len(file_names) > 0:
             download_path = self.download_file(file_names[0])
             return download_path
@@ -966,7 +965,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: The download path of the file.
         """
         file_name = file_link.split('/')[-1]
-        download_path = os.path.join(self.resources_dir, file_name)
+        download_path = os.path.join(World.data_directory[0], file_name)
         try:
             with request.urlopen(file_link, timeout=1) as response:
                 with open(download_path, 'wb') as file:

@@ -163,19 +163,22 @@ class RepositorySearch:
                 similar_files_in_folder.append(link)
         return similar_files_in_folder
 
-    def search_similar_file_names(self, search_query: List[str], find_all: Optional[bool] = True) -> List[str]:
+    def search_similar_file_names(self, search_query: List[str], find_all: Optional[bool] = True,
+                                  ignore: Optional[List[str]] = None) -> List[str]:
         """
         Search for similar file names within the repository.
 
         Parameters:
         - search_query (str): The query to search for in file names.
         - find_all (bool): If True, find all similar file names. If False, return the first match.
-
+        - ignore (list of str): List of filename patterns to ignore.
         Returns:
         - list of str: List of similar file names found within the repository.
         """
         stack = [self.repository_url] + self.stack
         similar_files = []
+        if ignore is None:
+            ignore = []
 
         while stack:
             folder_url = stack.pop()
@@ -186,7 +189,8 @@ class RepositorySearch:
                 if link.endswith('/'):
                     stack.append(link)
                 else:
-                    if any(query.lower() in link.lower() for query in search_query):
+                    if any(query.lower() in link.lower() for query in search_query) and \
+                            all(ig.lower() not in link.lower() for ig in ignore):
                         similar_files.append(link)
                         if not find_all:
                             return similar_files

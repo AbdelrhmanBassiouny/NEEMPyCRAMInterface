@@ -129,7 +129,7 @@ class TestNeemPycramInterface(TestCase):
         self.assertIsInstance(mesh_path, str)
 
     def test_find_file_in_data_dir(self):
-        path = self.pni._find_file_in_data_dir(['particle'])
+        path = self.pni._find_file_in_data_dir(['pr2'])
         self.assertIsInstance(path, str)
         with open(path, 'r') as f:
             self.assertTrue(f.read() is not None)
