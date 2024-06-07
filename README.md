@@ -34,4 +34,5 @@ neem_ids = [14, 15, 16]
 pni.replay_motion_of_neem(neem_ids, real_time=False)
 ```
 
-![Replaying the motions of multiple NEEMs](media/replay_vr_neems.mp4)
+https://github.com/AbdelrhmanBassiouny/NEEMPyCRAMInterface/assets/36744004/d6179b69-6dc0-43bc-ac18-6fa237542d03
+
