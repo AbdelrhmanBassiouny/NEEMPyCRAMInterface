@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neem_pycram_interface"
-version = "1.0.0"
+version = "1.0.1"
 description = "Using NEEMs database with the help of NEEMQuery python package to redo or replay neems using PyCRAM"
 readme = "README.md"
 authors = [{ name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de" }]
