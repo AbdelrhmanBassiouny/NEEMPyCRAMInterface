@@ -1,4 +1,12 @@
-pandas==2.0.3
-SQLAlchemy==2.0.4
-typing_extensions==4.10.0
-PyMySQL==1.1.0
+NEEMQuery
+bs4
+# PyCRAM Dependencies
+pyyaml
+rospkg
+gitpython
+pytransform3d
+anytree
+tqdm
+pybullet
+psutil
+requests
