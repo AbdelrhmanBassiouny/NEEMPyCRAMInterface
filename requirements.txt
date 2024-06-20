@@ -10,3 +10,4 @@ tqdm
 pybullet
 psutil
 requests
+owlready2>=0.45

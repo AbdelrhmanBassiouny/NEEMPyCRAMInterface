@@ -1,3 +1,4 @@
+import time
 from unittest import TestCase, skipIf, skip
 
 import pandas as pd
@@ -37,7 +38,9 @@ class TestNeemPycramInterface(TestCase):
 
     def tearDown(self):
         self.pni.reset()
-        self.world.reset_world()
+        self.vis_mark_publisher.lock.acquire()
+        self.world.current_world.reset_world_and_remove_objects()
+        self.vis_mark_publisher.lock.release()
 
     def get_pouring_action_data(self):
         query = (self.pni.query_task_motion_data(['Pour'], regexp=True).
@@ -91,7 +94,7 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(len(stamps) > 0)
         self.assertIsInstance(stamps[0], float)
 
-    def test_replay_neem_motions(self):
+    def test_replay_neem_motions_data(self):
         (self.pni.query_neems_motion_replay_data().
          filter_by_task_types(['Pour'], regexp=True)
          .filter_by_participant_type(['soma:DesignedContainer']))

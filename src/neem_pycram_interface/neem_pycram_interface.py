@@ -6,11 +6,17 @@ from dataclasses import dataclass
 from urllib import request
 
 import rospy
+from neem_query.enums import ColumnLabel as CL
+from neem_query.neem_interface import NeemInterface
+from neem_query.neem_query import NeemQuery
+from neem_query.neems_database import *
+from neem_query.query_result import QueryResult
 from sqlalchemy import and_
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Generator, Set
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set
 
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
+from pycram.datastructures.world import World
 from pycram.designator import ObjectDesignatorDescription
 from pycram.designators.action_designator import PickUpAction, ParkArmsAction, NavigateAction, GraspingAction, \
     SetGripperAction, LookAtAction, ReleaseAction, PlaceAction, GripAction, CloseAction, OpenAction, TransportAction, \
@@ -20,13 +26,8 @@ from pycram.designators.object_designator import BelieveObject
 from pycram.plan_failures import ObjectUnfetchable
 from pycram.process_module import simulated_robot
 from pycram.robot_descriptions import robot_description
-from pycram.world import World
 from pycram.world_concepts.world_object import Object
-from neem_query.enums import ColumnLabel as CL
-from neem_query.neem_interface import NeemInterface
-from neem_query.neem_query import NeemQuery
-from neem_query.neems_database import *
-from neem_query.query_result import QueryResult
+from pycram.external_interfaces.ik import IKError
 from .utils import RepositorySearch
 
 
@@ -148,7 +149,9 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param db_url: the URL to the NEEM database.
         """
         super().__init__(db_url)
-        self.all_data_dirs = World.data_directory
+        self.all_data_dirs = []
+        self.all_data_dirs.extend(World.data_directory)
+        self.all_data_dirs.append(World.data_directory[0] + '/robots')
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
         self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
         self.replay_environment_initialized = False
@@ -244,10 +247,17 @@ class PyCRAMNEEMInterface(NeemInterface):
 
         with simulated_robot():
 
-            self.pre_grasp_action(participant_designator, robot_designator)
+            self.pre_grasp_action(participant_designator)
 
             arms = [arm.name.lower() for arm in Arms]
-            GraspingAction(arms, participant_designator).resolve().perform()
+
+            def action():
+                GraspingAction(arms, participant_designator).resolve().perform()
+
+            try:
+                action()
+            except IKError:
+                self.mitigate_grasp_or_pick_failure(participant_designator, robot_designator, action)
 
     @staticmethod
     def spawn_pr2_and_get_object(pose: Optional[Pose] = None) -> Object:
@@ -257,7 +267,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: the pycram object for the PR2 robot.
         """
         if pose is None:
-            pose = Pose([1.5, 2.5, 0])
+            pose = Pose([1.6, 2.3, 0], [0, 0, 0.1, 1])
         return Object('pr2', ObjectType.ROBOT, robot_description.name + '.urdf', pose=pose)
 
     def get_latest_pose_of_participant(self,
@@ -294,25 +304,45 @@ class PyCRAMNEEMInterface(NeemInterface):
             pose = performer_motion_data.get_latest_pose_of_entity_instance(performer)
         return pose
 
-    def pre_grasp_action(self, participant_designator: ObjectDesignatorDescription,
-                         robot_designator: ObjectDesignatorDescription):
+    def pre_grasp_action(self, participant_designator: ObjectDesignatorDescription):
         """
-        Perform the pre-grasp action.
+        Perform the pre-grasp action by parking arms and moving the torso.
+        :param participant_designator: the participant designator.
         """
         self.get_ready_action()
-        pick_up_location = CostmapLocation(target=participant_designator.resolve(),
-                                           reachable_for=robot_designator.resolve()).resolve()
-        NavigateAction([pick_up_location.pose]).resolve().perform()
         participant_pose = participant_designator.resolve().world_object.get_pose()
         LookAtAction([participant_pose]).resolve().perform()
 
+    def mitigate_grasp_or_pick_failure(self, participant_designator: ObjectDesignatorDescription,
+                                       robot_designator: ObjectDesignatorDescription,
+                                       action: Callable[[], None]):
+        """
+        Mitigate the grasp or pick failure by moving the robot to a different pose.
+        :param participant_designator: the participant designator.
+        :param robot_designator: the robot designator.
+        :param action: the action to perform.
+        """
+        torso_pose = 0.3
+        while 0.3 >= torso_pose >= 0.1:
+            try:
+                self.get_ready_action(torso_pose)
+                pick_up_location = CostmapLocation(target=participant_designator.resolve(),
+                                                   reachable_for=robot_designator.resolve()).resolve()
+                print(pick_up_location)
+                NavigateAction([pick_up_location.pose]).resolve().perform()
+                action()
+                break
+            except StopIteration:
+                torso_pose -= 0.01
+
     @staticmethod
-    def get_ready_action():
+    def get_ready_action(torso_pose: Optional[float] = 0.25):
         """
         Get the ready action, which parks the arms and moves the torso.
+        :param torso_pose: the torso pose to move to.
         """
         ParkArmsAction([Arms.BOTH]).resolve().perform()
-        MoveTorsoAction([0.25]).resolve().perform()
+        MoveTorsoAction([torso_pose]).resolve().perform()
 
     def get_performer_motion_data(self, query_result: Optional[QueryResult] = None) -> ReplayNEEMMotionData:
         """
@@ -923,7 +953,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         return self._search_for_file_in_online_repository(self.urdf_repo_search, [urdf_name])
 
     def _search_for_file_in_online_repository(self, repo_search_obj: RepositorySearch,
-                                              file_names: List[str], ignore: Optional[List[str]] = None) -> Union[str, None]:
+                                              file_names: List[str], ignore: Optional[List[str]] = None) -> Union[
+        str, None]:
         """
         Search for a file in the online repository.
         :param repo_search_obj: the repository search object to use.
@@ -1007,7 +1038,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         else:
             return ObjectType.GENERIC_OBJECT
 
-    def get_performer_object_type(self, performer: str, query_result: Optional[QueryResult] = None)\
+    def get_performer_object_type(self, performer: str, query_result: Optional[QueryResult] = None) \
             -> Optional[ObjectType]:
         """
         Get the type of pycram object that is a performer in the neem task.
