@@ -10,14 +10,35 @@ in the NEEM using the PyCRAM framework.
 Make sure you have [MariaDB](https://www.digitalocean.com/community/tutorials/how-to-install-mariadb-on-ubuntu-20-04) installed on your device. 
 
 ### PyCRAM Installation
-Also you need to have [PyCRAM](https://github.com/AbdelrhmanBassiouny/pycram/tree/multiverse_interface) installed on your device,
+
+#### If you already have PyCRAM:
+
+Step 1: Add the other fork as a new remote
+```shell
+git remote add multiverse https://github.com/AbdelrhmanBassiouny/pycram.git
+```
+
+Step 2: Fetch the branches from the other fork
+```shell
+git fetch multiverse
+```
+
+Step 3: Check out the branch from the other fork
+```shell
+git checkout -b multiverse_interface multiverse/multiverse_interface
+```
+
+#### If you do not have PyCRAM:
+
+You need to have [PyCRAM](https://github.com/AbdelrhmanBassiouny/pycram) installed on your device,
 1. clone the PyCRAM repository, 
-2. follow the [PyCRAM]() installation instructions 
+2. follow the [PyCRAM installation instructions ](https://pycram.readthedocs.io/en/latest/installation.html)
 3. checkout the 'multiverse_interface' branch.
 ```shell
 git checkout multiverse_interface
 ```
 
+### Install NEEMPyCRAMInterface
 
 ```bash
 pip install neem_pycram_interface
