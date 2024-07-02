@@ -5,6 +5,20 @@ in combination with [PyCRAM](https://github.com/cram2/pycram) to be able to repl
 in the NEEM using the PyCRAM framework.
 ## Installation
 
+
+### MariaDB Installation
+Make sure you have [MariaDB](https://www.digitalocean.com/community/tutorials/how-to-install-mariadb-on-ubuntu-20-04) installed on your device. 
+
+### PyCRAM Installation
+Also you need to have [PyCRAM](https://github.com/AbdelrhmanBassiouny/pycram/tree/multiverse_interface) installed on your device,
+1. clone the PyCRAM repository, 
+2. follow the [PyCRAM]() installation instructions 
+3. checkout the 'multiverse_interface' branch.
+```shell
+git checkout multiverse_interface
+```
+
+
 ```bash
 pip install neem_pycram_interface
 ```
