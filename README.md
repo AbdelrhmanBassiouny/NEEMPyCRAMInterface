@@ -67,7 +67,30 @@ vis_mark_publisher = VizMarkerPublisher()
 
 neem_ids = [14, 15, 16]
 pni.replay_motion_of_neem(neem_ids, real_time=False)
+
+vis_mark_publisher._stop_publishing()
+world.exit()
 ```
 
 https://github.com/AbdelrhmanBassiouny/NEEMPyCRAMInterface/assets/36744004/d6179b69-6dc0-43bc-ac18-6fa237542d03
 
+### Redoing a task in a NEEM:
+
+Similar to replaying the motions, but now we try to redo a single task using PyCRAM actions.
+
+```Python
+from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface
+
+from pycram.datastructures.enums import WorldMode
+from pycram.worlds.bullet_world import BulletWorld
+from pycram.ros.viz_marker_publisher import VizMarkerPublisher
+
+pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
+world = BulletWorld(mode=WorldMode.DIRECT)
+vis_mark_publisher = VizMarkerPublisher()
+
+pni.redo_grasping_action(14)
+
+vis_mark_publisher._stop_publishing()
+world.exit()
+```
