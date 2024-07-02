@@ -10,3 +10,6 @@ tqdm
 pybullet
 psutil
 requests
+owlready2
+random_events
+probabilistic_model

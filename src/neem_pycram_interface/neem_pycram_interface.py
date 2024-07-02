@@ -7,7 +7,7 @@ from urllib import request
 
 import rospy
 from sqlalchemy import and_
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Generator, Set
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set
 
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
@@ -20,7 +20,7 @@ from pycram.designators.object_designator import BelieveObject
 from pycram.plan_failures import ObjectUnfetchable
 from pycram.process_module import simulated_robot
 from pycram.robot_descriptions import robot_description
-from pycram.world import World
+from pycram.datastructures.world import World
 from pycram.world_concepts.world_object import Object
 from neem_query.enums import ColumnLabel as CL
 from neem_query.neem_interface import NeemInterface

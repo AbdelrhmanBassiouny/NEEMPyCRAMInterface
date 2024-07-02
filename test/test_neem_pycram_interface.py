@@ -3,7 +3,7 @@ from unittest import TestCase, skipIf, skip
 import pandas as pd
 
 from neem_query.enums import ColumnLabel as CL
-from neem_pycram_interface.neem_pycram_interface import PyCRAMNEEMInterface, ReplayNEEMMotionData
+from neem_pycram_interface import PyCRAMNEEMInterface, ReplayNEEMMotionData
 from neem_query.query_result import QueryResult
 
 pycram_not_found = False
