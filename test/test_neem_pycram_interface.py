@@ -6,7 +6,7 @@ from neem_query.enums import ColumnLabel as CL
 from neem_pycram_interface import PyCRAMNEEMInterface, ReplayNEEMMotionData
 from neem_query.query_result import QueryResult
 
-pycram_not_found = False
+pycram_found = True
 try:
     from pycram.datastructures.pose import Pose, Transform
     from pycram.world_concepts.world_object import Object
@@ -14,18 +14,21 @@ try:
     from pycram.worlds.bullet_world import BulletWorld
     from pycram.ros.viz_marker_publisher import VizMarkerPublisher
 except ImportError:
-    pycram_not_found = True
+    pycram_found = False
 
 
-@skipIf(pycram_not_found, "PyCRAM not found.")
+@skipIf(not pycram_found, "PyCRAM not found.")
 class TestNeemPycramInterface(TestCase):
     neem_qr: QueryResult
     pni: PyCRAMNEEMInterface
-    world: BulletWorld
-    vis_mark_publisher: VizMarkerPublisher
+    if pycram_found:
+        world: BulletWorld
+        vis_mark_publisher: VizMarkerPublisher
 
     @classmethod
     def setUpClass(cls):
+        if not pycram_found:
+            return
         cls.pni = PyCRAMNEEMInterface('mysql+pymysql://newuser:password@localhost/test')
         cls.world = BulletWorld(mode=WorldMode.DIRECT)
         cls.vis_mark_publisher = VizMarkerPublisher()
@@ -37,7 +40,7 @@ class TestNeemPycramInterface(TestCase):
 
     def tearDown(self):
         self.pni.reset()
-        self.world.reset_world()
+        self.world.current_world.reset_world_and_remove_objects()
 
     def get_pouring_action_data(self):
         query = (self.pni.query_task_motion_data(['Pour'], regexp=True).
@@ -91,7 +94,7 @@ class TestNeemPycramInterface(TestCase):
         self.assertTrue(len(stamps) > 0)
         self.assertIsInstance(stamps[0], float)
 
-    def test_replay_neem_motions(self):
+    def test_replay_neem_motions_data(self):
         (self.pni.query_neems_motion_replay_data().
          filter_by_task_types(['Pour'], regexp=True)
          .filter_by_participant_type(['soma:DesignedContainer']))
