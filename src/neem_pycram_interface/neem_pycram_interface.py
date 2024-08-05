@@ -19,7 +19,7 @@ from pycram.designators.location_designator import CostmapLocation
 from pycram.designators.object_designator import BelieveObject
 from pycram.plan_failures import ObjectUnfetchable
 from pycram.process_module import simulated_robot
-from pycram.robot_descriptions import robot_description
+from pycram.robot_description import RobotDescription
 from pycram.datastructures.world import World
 from pycram.world_concepts.world_object import Object
 from neem_query.enums import ColumnLabel as CL
@@ -85,7 +85,7 @@ def fetch_action(object_designator: ObjectDesignatorDescription.Object, arm: str
     :param object_designator: the object to fetch.
     :param arm: the arm to use to fetch the object.
     """
-    robot_desig = BelieveObject(names=[robot_description.name])
+    robot_desig = BelieveObject(names=[RobotDescription.current_robot_description.name])
     ParkArmsAction([Arms.BOTH]).resolve().perform()
     pickup_loc = CostmapLocation(target=object_designator, reachable_for=robot_desig.resolve(),
                                  reachable_arm=arm)
@@ -246,7 +246,7 @@ class PyCRAMNEEMInterface(NeemInterface):
 
             self.pre_grasp_action(participant_designator, robot_designator)
 
-            arms = [arm.name.lower() for arm in Arms]
+            arms = [arm for arm in Arms]
             GraspingAction(arms, participant_designator).resolve().perform()
 
     @staticmethod
@@ -258,7 +258,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         if pose is None:
             pose = Pose([1.5, 2.5, 0])
-        return Object('pr2', ObjectType.ROBOT, robot_description.name + '.urdf', pose=pose)
+        return Object('pr2', ObjectType.ROBOT, 'pr2.urdf', pose=pose)
 
     def get_latest_pose_of_participant(self,
                                        participant: str,
@@ -700,6 +700,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         query_result = query_result if query_result is not None else self.get_result()
         environments = query_result.get_environments()
+        if len(environments) == 0:
+            raise ValueError('No environment found in this query result')
         environment_path = self.get_description_of_environment(environments[0])
         return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
 
@@ -742,6 +744,8 @@ class PyCRAMNEEMInterface(NeemInterface):
         entities = query_result.get_column_values(entity_column_name, unique=True)
         entity_objects = {}
         for entity in entities:
+            if entity in [None, 'NIL']:
+                continue
             try:
                 description = description_getter(entity, query_result)
             except ValueError as e:
@@ -841,17 +845,18 @@ class PyCRAMNEEMInterface(NeemInterface):
             logging.error(f'No description found for participant {participant}')
             raise ValueError(f'No description found for participant {participant}')
 
-    def _find_file_in_data_dir(self, file_name: List[str]) -> Union[str, None]:
+    def _find_file_in_data_dir(self, given_file_names: List[str]) -> Union[str, None]:
         """
         Find a file in the data directories.
-        :param file_name: the file to find.
+        :param given_file_names: the file to find.
         :return: the path of the file in the data directories.
         """
-        for data_dir in self.all_data_dirs:
-            for file in os.listdir(data_dir):
-                for name in file_name:
-                    if name in file:
-                        return os.path.join(data_dir, file)
+        for root_folder in self.all_data_dirs:
+            for dirpath, dirnames, filenames in os.walk(root_folder):
+                for given_name in given_file_names:
+                    for filename in filenames:
+                        if given_name in filename:
+                            return os.path.join(dirpath, filename)
 
     def _filter_participant_name(self, participant: str) -> List[str]:
         """

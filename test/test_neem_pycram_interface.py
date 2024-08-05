@@ -197,3 +197,11 @@ class TestNeemPycramInterface(TestCase):
 
     def test_motion_replay(self):
         self.pni.replay_motion_of_neem([14], real_time=False)
+
+    def test_set_pre_task_state(self):
+        self.pni.query_actions(['grasping']).filter_by_sql_neem_id([14])
+        task = self.pni.get_result().get_tasks()[0]
+        participant_designators, robot_designator = self.pni.set_pre_task_state(task, 14)
+        self.assertIsInstance(participant_designators, dict)
+        self.assertEqual(robot_designator.resolve().name, "pr2")
+
