@@ -17,7 +17,7 @@ from pycram.designators.action_designator import PickUpAction, ParkArmsAction, N
     DetectAction, MoveTorsoAction
 from pycram.designators.location_designator import CostmapLocation
 from pycram.designators.object_designator import BelieveObject
-from pycram.plan_failures import ObjectUnfetchable
+from pycram.failures import ObjectUnfetchable
 from pycram.process_module import simulated_robot
 from pycram.robot_description import RobotDescription
 from pycram.datastructures.world import World
