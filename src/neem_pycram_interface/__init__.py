@@ -1,6 +1,8 @@
 import importlib
 import subprocess
 import sys
+import os
+
 
 PACKAGE_NAME = "pycram"
 REQUIRED_COMMIT = "284a1b843b0e0f55ece06de68f4170b6ed44ca48"
