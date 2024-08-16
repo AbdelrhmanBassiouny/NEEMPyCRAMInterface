@@ -2,6 +2,7 @@ import importlib
 import subprocess
 import sys
 import os
+import rospkg
 
 
 PACKAGE_NAME = "pycram"
@@ -11,11 +12,8 @@ CHECKED = False
 
 def get_installed_commit_hash():
     try:
-        # Import the package
-        package = importlib.import_module(PACKAGE_NAME)
-
-        # Get the package directory
-        package_dir = os.path.dirname(package.__file__)
+        # Get the package directory using rospkg
+        package_dir = rospkg.RosPack().get_path(PACKAGE_NAME)
 
         # Use git to get the current commit hash
         commit_hash = subprocess.check_output(
