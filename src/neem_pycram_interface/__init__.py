@@ -3,7 +3,7 @@ import subprocess
 import sys
 import os
 import rospkg
-
+import rospy
 
 PACKAGE_NAME = "pycram"
 REQUIRED_COMMIT = "284a1b843b0e0f55ece06de68f4170b6ed44ca48"
@@ -30,16 +30,17 @@ def get_installed_commit_hash():
 def check_commit():
     commit_hash = get_installed_commit_hash()
 
+    msg = f"Commit hash for {PACKAGE_NAME} does not match the required commit {REQUIRED_COMMIT},"
+    f" please checkout the required commit before using this package, by running:\n"
+    f"git checkout {REQUIRED_COMMIT} \n"
+    f"in the {PACKAGE_NAME} package directory."
+
     if commit_hash != REQUIRED_COMMIT:
-        raise ValueError(f"Commit hash for {PACKAGE_NAME} does not match the required commit {REQUIRED_COMMIT},"
-                         f" please checkout the required commit before using this package, by running:\n"
-                         f"git checkout {REQUIRED_COMMIT} \n"
-                         f"in the {PACKAGE_NAME} package directory.")
+        rospy.logwarn(msg)
 
 
 if not CHECKED:
     check_commit()
     CHECKED = True
-
 
 from .neem_pycram_interface import *
