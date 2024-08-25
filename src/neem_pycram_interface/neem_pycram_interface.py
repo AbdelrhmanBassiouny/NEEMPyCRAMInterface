@@ -148,7 +148,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :param db_url: the URL to the NEEM database.
         """
         super().__init__(db_url)
-        self.all_data_dirs = World.data_directory
+        self.all_data_dirs = World.get_data_directories()
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
         self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
         self.replay_environment_initialized = False
@@ -970,7 +970,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: The download path of the file.
         """
         file_name = file_link.split('/')[-1]
-        download_path = os.path.join(World.data_directory[0], file_name)
+        download_path = os.path.join(self.all_data_dirs[0], file_name)
         try:
             with request.urlopen(file_link, timeout=1) as response:
                 with open(download_path, 'wb') as file:

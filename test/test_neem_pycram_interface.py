@@ -40,7 +40,7 @@ class TestNeemPycramInterface(TestCase):
 
     def tearDown(self):
         self.pni.reset()
-        self.world.current_world.reset_world_and_remove_objects()
+        self.world.remove_all_objects()
 
     def get_pouring_action_data(self):
         query = (self.pni.query_task_motion_data(['Pour'], regexp=True).
