@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from urllib import request
 
 import rospy
-from sqlalchemy import and_
+from sqlalchemy import and_, Engine
 from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set
 
 from pycram.datastructures.enums import ObjectType, Arms, Grasp
@@ -142,12 +142,14 @@ class PyCRAMNEEMInterface(NeemInterface):
     A list of known robots that can be spawned and used in pycram.
     """
 
-    def __init__(self, db_url: str):
+    def __init__(self, sql_uri: Optional[str] = None, engine: Optional[Engine] = None):
         """
         Initialize the PyCRAM NEEM interface.
-        :param db_url: the URL to the NEEM database.
+
+        :param sql_uri: the URL to the NEEM database.
+        :param engine: the SQLAlchemy engine to connect to the NEEM database.
         """
-        super().__init__(db_url)
+        super().__init__(sql_uri, engine)
         self.all_data_dirs = World.get_data_directories()
         self.mesh_repo_search = RepositorySearch(self.neem_data_link, start_search_in=self._get_mesh_links())
         self.urdf_repo_search = RepositorySearch(self.neem_data_link, start_search_in=[self._get_urdf_link()])
@@ -157,10 +159,11 @@ class PyCRAMNEEMInterface(NeemInterface):
     def from_pycram_neem_interface(cls, pycram_neem_interface: 'PyCRAMNEEMInterface'):
         """
         Create a new PyCRAM NEEM interface from an existing one.
+
         :param pycram_neem_interface: the existing PyCRAM NEEM interface.
         :return: the new PyCRAM NEEM interface.
         """
-        return cls(pycram_neem_interface.engine.url.__str__().replace('***', 'password'))
+        return cls(engine=pycram_neem_interface.engine)
 
     def redo_neem_plan(self):
         """
