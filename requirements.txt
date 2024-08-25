@@ -1,4 +1,4 @@
-NEEMQuery
+NEEMQuery==1.1.4
 bs4
 # PyCRAM Dependencies
 pyyaml
