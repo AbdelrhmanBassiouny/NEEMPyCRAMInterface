@@ -1012,6 +1012,8 @@ class PyCRAMNEEMInterface(NeemInterface):
             return ObjectType.MILK
         elif 'cup' in participant.lower():
             return ObjectType.JEROEN_CUP
+        elif 'hand' in participant.lower():
+            return ObjectType.HUMAN
         else:
             return ObjectType.GENERIC_OBJECT
 
