@@ -1,3 +1,4 @@
+import datetime
 import logging
 import os
 import shutil
@@ -628,13 +629,15 @@ class PyCRAMNEEMInterface(NeemInterface):
         self.replay_motions_in_query()
 
     def replay_motions_in_query(self, query_result: Optional[QueryResult] = None,
-                                real_time: Optional[bool] = True) -> None:
+                                real_time: Optional[bool] = True,
+                                step_time: Optional[datetime.timedelta] = None) -> None:
         """
         Replay NEEMs Motion using PyCRAM. The query should contain:
          environment, participant, translation, orientation, stamp.
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         :param query_result: the query result to replay the motions from.
         :param real_time: whether to replay the motions in real time or not.
+        :param step_time: the time to sleep between each step, if real time is True it is ignored.
         """
         query_result = query_result if query_result is not None else self.get_result()
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
@@ -653,6 +656,8 @@ class PyCRAMNEEMInterface(NeemInterface):
                     wait_time = 1
                 if real_time:
                     time.sleep(wait_time)
+                elif step_time is not None:
+                    time.sleep(step_time.total_seconds())
             prev_time = current_time
             participant_objects[participant].set_pose(pose)
             if not self.replay_environment_initialized:
