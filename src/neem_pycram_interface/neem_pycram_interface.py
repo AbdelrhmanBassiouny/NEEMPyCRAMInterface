@@ -8,9 +8,10 @@ from urllib import request
 
 import rospy
 from sqlalchemy import and_, Engine
-from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set
+from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set, Type
 
-from pycram.datastructures.enums import ObjectType, Arms, Grasp
+import pycrap
+from pycram.datastructures.enums import Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designator import ObjectDesignatorDescription
 from pycram.designators.action_designator import PickUpAction, ParkArmsAction, NavigateAction, GraspingAction, \
@@ -28,6 +29,8 @@ from neem_query.neem_interface import NeemInterface
 from neem_query.neem_query import NeemQuery
 from neem_query.neems_database import *
 from neem_query.query_result import QueryResult
+
+from pycrap import PhysicalObject
 from .utils import RepositorySearch
 
 
@@ -262,7 +265,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         if pose is None:
             pose = Pose([1.5, 2.5, 0])
-        return Object('pr2', ObjectType.ROBOT, 'pr2.urdf', pose=pose)
+        return Object('pr2', pycrap.Robot, 'pr2.urdf', pose=pose)
 
     def get_latest_pose_of_participant(self,
                                        participant: str,
@@ -348,7 +351,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         if len(performer_designators) > 0:
             performer_designator = list(performer_designators.values())[0]
             performer_object = performer_designator.resolve().world_object
-            if performer_object.obj_type == ObjectType.ROBOT:
+            if performer_object.is_a_robot:
                 robot = performer_object
                 robot_pose = self.get_latest_pose_of_performer(list(performer_designators.keys())[0])
                 robot.set_pose(robot_pose)
@@ -711,7 +714,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         if len(environments) == 0:
             raise ValueError('No environment found in this query result')
         environment_path = self.get_description_of_environment(environments[0])
-        return Object(environments[0], ObjectType.ENVIRONMENT, environment_path)
+        return Object(environments[0], pycrap.Location, environment_path)
 
     def get_and_spawn_performers(self, query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
@@ -738,7 +741,7 @@ class PyCRAMNEEMInterface(NeemInterface):
     def get_and_spawn_entities(self,
                                entity_column_name: str,
                                description_getter: Callable[[str, QueryResult], str],
-                               object_type_getter: Callable[[str, QueryResult], ObjectType],
+                               object_type_getter: Callable[[str, QueryResult], Type[PhysicalObject]],
                                query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
         Get and spawn the entities in the NEEM using PyCRAM.
@@ -1005,25 +1008,25 @@ class PyCRAMNEEMInterface(NeemInterface):
         return environment_path
 
     @staticmethod
-    def get_object_type(participant: str) -> ObjectType:
+    def get_object_type(participant: str) -> Type[PhysicalObject]:
         """
         Get the type of pycram object that is a participant in the neem task.
         :param participant: the neem task participant to get the type of.
         :return: the type of the participant/object.
         """
         if 'bowl' in participant.lower() or 'pot' in participant.lower():
-            return ObjectType.BOWL
+            return pycrap.Bowl
         elif 'milk' in participant.lower():
-            return ObjectType.MILK
+            return pycrap.Milk
         elif 'cup' in participant.lower():
-            return ObjectType.JEROEN_CUP
+            return pycrap.Cup
         elif 'hand' in participant.lower():
-            return ObjectType.HUMAN
+            return pycrap.Human
         else:
-            return ObjectType.GENERIC_OBJECT
+            return pycrap.Genobj
 
     def get_performer_object_type(self, performer: str, query_result: Optional[QueryResult] = None)\
-            -> Optional[ObjectType]:
+            -> Optional[Type[PhysicalObject]]:
         """
         Get the type of pycram object that is a performer in the neem task.
         :param performer: the neem task performer to get the type of.
@@ -1032,13 +1035,13 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
 
         if self.is_a_known_robot(performer):
-            return ObjectType.ROBOT
+            return pycrap.Robot
 
         query_result = query_result if query_result is not None else self.get_result()
         performer_type = query_result.filter_by_performer([performer]).get_performer_types()[0]
         if performer_type is not None:
             if self.is_a_human(performer_type):
-                return ObjectType.HUMAN
+                return pycrap.Human
 
         return None
 
