@@ -10,7 +10,6 @@ import rospy
 from sqlalchemy import and_, Engine
 from typing_extensions import Optional, Dict, Tuple, List, Callable, Union, Set, Type
 
-import pycrap
 from pycram.datastructures.enums import Arms, Grasp
 from pycram.datastructures.pose import Pose, Transform
 from pycram.designator import ObjectDesignatorDescription
@@ -30,7 +29,7 @@ from neem_query.neem_query import NeemQuery
 from neem_query.neems_database import *
 from neem_query.query_result import QueryResult
 
-from pycrap import PhysicalObject
+from pycrap.ontologies import PhysicalObject, Robot, Location, Bowl, Milk, Cup, Human
 from .utils import RepositorySearch
 
 
@@ -265,7 +264,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
         if pose is None:
             pose = Pose([1.5, 2.5, 0])
-        return Object('pr2', pycrap.Robot, 'pr2.urdf', pose=pose)
+        return Object('pr2', Robot, 'pr2.urdf', pose=pose)
 
     def get_latest_pose_of_participant(self,
                                        participant: str,
@@ -640,7 +639,7 @@ class PyCRAMNEEMInterface(NeemInterface):
          One could use the get_motion_replay_data method to get the data. Then filter it as needed.
         :param query_result: the query result to replay the motions from.
         :param real_time: whether to replay the motions in real time or not.
-        :param step_time: the time to sleep between each step, if real time is True it is ignored.
+        :param step_time: the time to sleep between each step.
         """
         query_result = query_result if query_result is not None else self.get_result()
         environment_obj, participant_objects = self.get_and_spawn_environment_and_participants(query_result)
@@ -654,9 +653,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         prev_time = 0
         for participant, pose, current_time in zip(participant_instances, poses, times):
             if prev_time > 0:
-                wait_time = current_time - prev_time
-                if wait_time > 1:
-                    wait_time = 1
+                wait_time = min(1.0, current_time - prev_time)
                 if real_time:
                     time.sleep(wait_time)
                 elif step_time is not None:
@@ -714,7 +711,7 @@ class PyCRAMNEEMInterface(NeemInterface):
         if len(environments) == 0:
             raise ValueError('No environment found in this query result')
         environment_path = self.get_description_of_environment(environments[0])
-        return Object(environments[0], pycrap.Location, environment_path)
+        return Object(environments[0], Location, environment_path)
 
     def get_and_spawn_performers(self, query_result: Optional[QueryResult] = None) -> Dict[str, Object]:
         """
@@ -1015,15 +1012,15 @@ class PyCRAMNEEMInterface(NeemInterface):
         :return: the type of the participant/object.
         """
         if 'bowl' in participant.lower() or 'pot' in participant.lower():
-            return pycrap.Bowl
+            return Bowl
         elif 'milk' in participant.lower():
-            return pycrap.Milk
+            return Milk
         elif 'cup' in participant.lower():
-            return pycrap.Cup
+            return Cup
         elif 'hand' in participant.lower():
-            return pycrap.Human
+            return Human
         else:
-            return pycrap.Genobj
+            return PhysicalObject
 
     def get_performer_object_type(self, performer: str, query_result: Optional[QueryResult] = None)\
             -> Optional[Type[PhysicalObject]]:
@@ -1035,13 +1032,13 @@ class PyCRAMNEEMInterface(NeemInterface):
         """
 
         if self.is_a_known_robot(performer):
-            return pycrap.Robot
+            return Robot
 
         query_result = query_result if query_result is not None else self.get_result()
         performer_type = query_result.filter_by_performer([performer]).get_performer_types()[0]
         if performer_type is not None:
             if self.is_a_human(performer_type):
-                return pycrap.Human
+                return Human
 
         return None
 
