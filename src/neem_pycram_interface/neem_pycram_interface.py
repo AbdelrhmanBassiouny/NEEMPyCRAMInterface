@@ -82,7 +82,7 @@ class NEEMObjects:
     performers: Dict[str, Object]
 
 
-def fetch_action(object_designator: ObjectDesignatorDescription.Object, arm: str) -> None:
+def fetch_action(object_designator: ObjectDesignatorDescription, arm: str) -> None:
     """
     Fetch an object using the given arm.
     :param object_designator: the object to fetch.
