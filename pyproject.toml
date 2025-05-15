@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neem_pycram_interface"
-version = "1.0.175"
+version = "1.0.176"
 description = "Using NEEMs database with the help of NEEMQuery python package to redo or replay neems using PyCRAM"
 readme = "README.md"
 authors = [{ name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de" }]
@@ -15,25 +15,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 keywords = ["query", "neems", "database", "sql", "robotics", "knowledge", "memories", "episodic", "replay", "redo actions", "pycram"]
-dependencies = ["NEEMQuery==1.1.4",
-    "bs4",
-    # PyCRAM Dependencies
-    "pyyaml",
-    "rospkg",
-    "gitpython",
-    "pytransform3d",
-    "anytree",
-    "tqdm",
-    "pybullet",
-    "psutil",
-    "requests",
-    "owlready2",
-    "random_events",
-    "probabilistic_model",
-    "trimesh",
-    "pydub",
-    "gtts"
-]
+dependencies = ["NEEMQuery", "bs4"]
 requires-python = ">=3.8"
 
 [project.urls]
